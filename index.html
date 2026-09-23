@@ -1,0 +1,1724 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1">
+<title>BOTBURNER — a FinnBots game</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Jersey+15&family=Plus+Jakarta+Sans:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --plum:#5f4c57; --plum-deep:#3e323a; --amber:#f2a03d; --electric:#3a6ff7;
+    --peach:#f5c8a0; --soft:#fdf3e7; --ink:#3e323a; --muted:#8a7a82; --red:#c0392b;
+    --s1:4px; --s2:8px; --s3:12px; --s4:16px; --s6:24px;
+    --r-sm:8px; --r-md:12px; --r-lg:16px; --r-xl:22px;
+    --sh1:0 1px 2px rgba(62,50,58,.12); --sh2:0 4px 14px rgba(62,50,58,.16);
+    --disp:'Jersey 15',system-ui,sans-serif; --body:'Plus Jakarta Sans',system-ui,sans-serif;
+  }
+  *{box-sizing:border-box}
+  html,body{height:100dvh;overflow:hidden;margin:0}
+  body{ font-family:var(--body); color:var(--ink);
+    background:radial-gradient(120% 80% at 50% 0%, var(--soft), var(--peach));
+    -webkit-font-smoothing:antialiased; user-select:none; -webkit-user-select:none; touch-action:none; }
+  /* ===== GAME-FIRST LAYOUT: the canvas owns the viewport; chrome is one slim bar =====
+     (Folded back from BOTMAN, 2026-09-19 — every game maximises the play area.) */
+  .wrap{height:100%;max-width:1400px;margin:0 auto;display:flex;flex-direction:column;padding:var(--s2) var(--s1) var(--s1);gap:var(--s1)}
+  .topbar{display:flex;align-items:center;gap:var(--s2);min-height:32px;flex:none}
+  .pill{font-family:var(--disp);font-size:15px;letter-spacing:.5px;color:#fff;background:var(--plum);padding:2px var(--s3);border-radius:999px;box-shadow:var(--sh1);white-space:nowrap}
+  .title{font-family:var(--disp);font-size:22px;line-height:1;color:var(--plum-deep);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .iconbtn{appearance:none;border:0;background:#fff;color:var(--plum);width:30px;height:30px;border-radius:50%;font-family:var(--disp);font-size:17px;box-shadow:var(--sh1);cursor:pointer;flex:none}
+  .iconbtn:focus-visible{outline:3px solid var(--electric);outline-offset:2px}
+  .modebar{display:flex;gap:2px;background:rgba(255,255,255,.55);border-radius:999px;padding:2px;box-shadow:var(--sh1);flex:none}
+  .modepill{appearance:none;border:0;cursor:pointer;font-family:var(--disp);font-size:12.5px;padding:4px 11px;border-radius:999px;background:transparent;color:var(--muted);white-space:nowrap}
+  .modepill.active{background:var(--amber);color:var(--plum-deep)}
+  .modepill:disabled{opacity:.5;cursor:default}
+  .modepill:focus-visible{outline:2px solid var(--electric);outline-offset:2px}
+  .testBanner{background:var(--amber);color:#4a2c10;font-weight:700;text-align:center;font-size:11.5px;padding:4px 10px;border-radius:var(--r-md);flex:none}
+  .testBanner.hidden{display:none}
+  .walletbar{display:none;flex-direction:column;gap:5px;background:rgba(255,255,255,.6);border-radius:var(--r-md);padding:7px var(--s3);box-shadow:var(--sh1);flex:none}
+  body.mode-paid .walletbar{display:flex}
+  .walletrow{display:flex;align-items:center;gap:8px}
+  .walletrow .lbl{font-size:12px;color:var(--plum-deep);flex:1;line-height:1.3}
+  .connect-btn{appearance:none;border:0;cursor:pointer;font-family:var(--disp);font-size:14px;background:var(--plum);color:#fff;padding:6px 16px;border-radius:999px;box-shadow:var(--sh1)}
+  .connect-btn:disabled{opacity:.6;cursor:default}
+  .wallet-status{font-size:12px;color:var(--muted);line-height:1.35}
+  .wallet-status.hidden{display:none}
+  .wallet-status.ok{color:var(--plum-deep)} .wallet-status.warn{color:var(--red)}
+  .wallet-status .addr{font-family:ui-monospace,monospace;color:var(--plum)}
+  /* facts: hidden in Free (the How-To carries the message); slim safety line only in Paid */
+  .facts{display:none;font-size:11.5px;color:var(--plum-deep);background:rgba(255,255,255,.6);border-radius:var(--r-md);padding:4px var(--s3);text-align:center;align-items:center;justify-content:center;gap:8px;box-shadow:var(--sh1);flex:none}
+  body.mode-paid .facts{display:flex}
+  .facts b{font-weight:700}
+  .dot-sep{opacity:.4}
+  /* Slim HUD row (SCORE / TIME / LIVES). If your game draws its OWN in-canvas HUD (like BOTMAN),
+     hide this to reclaim the row for even more canvas:  .hud{display:none}  */
+  .hud{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:var(--s2) var(--s3);font-family:var(--disp);color:var(--plum-deep);background:rgba(255,255,255,.55);border-radius:var(--r-md);padding:3px var(--s4);min-height:26px;box-shadow:var(--sh1);flex:none}
+  .hud .lab{font-size:10px;color:var(--muted);letter-spacing:1px}
+  .hud .val{font-size:16px;line-height:1}
+  .hud .val.warn{color:var(--red)}
+  .lives{display:inline-flex;gap:4px;align-items:center}
+  .life{width:9px;height:9px;border-radius:50%;background:var(--amber);box-shadow:var(--sh1)}
+  .life.off{background:rgba(0,0,0,.14);box-shadow:none}
+  /* the play surface eats ALL remaining space; the canvas maxes inside it (JS letterboxes) */
+  .surface{flex:1 1 auto;min-height:0;display:flex;align-items:center;justify-content:center;padding:2px 0}
+  /* Canvas fit — fills the surface, letterboxed by fitCanvas. Tune aspect-ratio to your game (portrait 224/288, landscape 3/2). */
+  canvas{ width:100%;height:auto;max-width:100%;max-height:100%;aspect-ratio:16/9;background:#101826;border-radius:var(--r-lg);box-shadow:var(--sh2);image-rendering:pixelated;image-rendering:crisp-edges;touch-action:none; }
+  /* BOTBURNER draws its own arcade HUD in-canvas — reclaim the chrome row. */
+  .hud{display:none}
+  /* Rotate hint — portrait phones only (the sky chase is a wide landscape board) */
+  .rotate{display:none}
+  @media (orientation:portrait) and (max-width:820px) and (pointer:coarse){
+    .rotate{display:flex;align-items:center;justify-content:center;gap:6px;
+      background:rgba(255,255,255,.6);border-radius:var(--r-md);padding:7px var(--s3);
+      font-size:12.5px;color:var(--plum-deep);text-align:center;box-shadow:var(--sh1);flex:none}
+  }
+  /* Two-thumb cabinet: flight stick LEFT, triggers + throttle RIGHT. */
+  .controls{display:flex;gap:var(--s4);align-items:center;justify-content:center;flex:none;padding:2px 0}
+  .controls.twothumb{width:100%;justify-content:space-between;max-width:600px;margin:0 auto}
+  .stickpad{width:104px;height:74px;border-radius:var(--r-lg);background:rgba(255,255,255,.82);
+    box-shadow:var(--sh1);display:flex;align-items:center;justify-content:center;touch-action:none;
+    font-family:var(--disp);font-size:12px;line-height:1.1;color:var(--muted);text-align:center;
+    border:2px solid rgba(95,76,87,.18);cursor:grab}
+  .stickpad:active{background:var(--peach);cursor:grabbing}
+  .cluster.act{display:flex;align-items:center;gap:var(--s2)}
+  .thr{display:flex;flex-direction:column;gap:5px}
+  .ctl.thrbtn{width:58px;height:34px;font-size:13px;background:rgba(255,255,255,.9);color:var(--plum-deep)}
+  .ctl.thrbtn.on,.ctl.thrbtn:active{background:var(--amber)}
+  .ctl.fire.big{width:78px;height:78px;border-radius:50%;font-size:19px;color:#fff;background:var(--plum)}
+  .ctl.fire.big.on,.ctl.fire.big:active{background:var(--amber);color:var(--plum-deep)}
+  .dpad{display:grid;grid-template-columns:repeat(3,48px);grid-template-rows:repeat(3,42px);gap:5px}
+  .ctl{appearance:none;border:0;cursor:pointer;font-family:var(--disp);font-size:20px;color:var(--plum-deep);background:rgba(255,255,255,.9);border-radius:var(--r-sm);box-shadow:var(--sh1);touch-action:none;user-select:none;-webkit-user-select:none;display:flex;align-items:center;justify-content:center}
+  .ctl:active,.ctl.on{transform:translateY(1px);background:var(--amber)}
+  .ctl:focus-visible{outline:3px solid var(--electric);outline-offset:2px}
+  .ctl.fire{font-size:13px;color:#fff;background:var(--plum)}
+  .ctl.fire:active,.ctl.fire.on{background:var(--plum-deep)}
+  #padU{grid-area:1/2/2/3} #padL{grid-area:2/1/3/2} #padFire{grid-area:2/2/3/3} #padR{grid-area:2/3/3/4} #padD{grid-area:3/2/4/3}
+  /* footer retired to reclaim the row — its links live in the How-To overlay (.lnks) */
+  .foot{display:none}
+  @media (min-height:720px){ .dpad{grid-template-columns:repeat(3,54px);grid-template-rows:repeat(3,46px)} }
+  @media (pointer:fine){ .controls{opacity:.92} }
+  /* ===== ORIENTATION-AWARE PLAY AREA (JS adds body.is-portrait / .is-landscape from the canvas aspect) =====
+     LANDSCAPE games are width-bound → the 1400px .wrap already grows them; nothing extra needed.
+     PORTRAIT games are height-bound → the ONLY way to enlarge the canvas is to reclaim vertical chrome,
+     so trim padding/title/controls and drop the Free-mode facts line. Keeps d-pad ≥44px (tappable). */
+  body.is-portrait .wrap{padding-top:4px;padding-bottom:4px;gap:4px}
+  body.is-portrait:not(.mode-paid) .facts{display:none}
+  body.is-portrait .topbar{min-height:0}
+  body.is-portrait .title{font-size:18px}
+  body.is-portrait .controls{padding:2px 0}
+  /* d-pad control cluster hugs its content (centered pill), not a full-width empty bar.
+     :has(.dpad) leaves two-thumb / canvas-only control rows (which span on purpose) alone. */
+  body.is-portrait .controls:has(.dpad){align-self:center;width:auto;padding:6px 18px}
+  body.is-portrait .dpad{grid-template-columns:repeat(3,48px);grid-template-rows:repeat(3,38px)}
+  @media (min-height:720px){ body.is-portrait .dpad{grid-template-columns:repeat(3,48px);grid-template-rows:repeat(3,40px)} }
+  .overlay{position:fixed;inset:0;display:none;align-items:center;justify-content:center;background:rgba(42,34,48,.55);backdrop-filter:blur(2px);padding:var(--s4);z-index:20}
+  .overlay.show{display:flex}
+  body.mode-paid .modebar,body.mode-paid .walletbar{position:relative;z-index:21}
+  .card{background:var(--soft);border-radius:var(--r-xl);box-shadow:var(--sh2);max-width:380px;width:100%;padding:var(--s6);text-align:center}
+  .card h2{font-family:var(--disp);font-size:30px;margin:0 0 var(--s2);color:var(--plum-deep)}
+  .card.win h2{color:var(--amber)}
+  .card p{font-size:13.5px;line-height:1.5;margin:var(--s2) 0;color:var(--plum-deep)}
+  .card .big{font-family:var(--disp);font-size:22px;color:var(--plum-deep);margin:var(--s3) 0}
+  .card .big span{color:var(--amber)}
+  .btn{appearance:none;border:0;font-family:var(--disp);font-size:18px;color:#fff;background:var(--plum);padding:10px var(--s6);border-radius:999px;cursor:pointer;box-shadow:var(--sh1);margin-top:var(--s3)}
+  .btn:hover{background:var(--plum-deep)}
+  .btn:disabled{opacity:.5;cursor:default}
+  .btn:focus-visible{outline:3px solid var(--electric);outline-offset:2px}
+  .rules{text-align:left}
+  .rules li{font-size:13px;line-height:1.55;margin:5px 0}
+  .safe{font-size:11.5px;color:var(--muted);margin-top:var(--s3)}
+  .lnks{font-size:12.5px;margin-top:var(--s3)}
+  .lnks a{color:var(--plum);text-decoration:none;margin:0 6px;font-weight:600}
+  .lnks a:hover{text-decoration:underline}
+  .sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);border:0}
+  .sheet{position:fixed;inset:0;background:rgba(42,34,48,.6);display:none;align-items:center;justify-content:center;padding:var(--s4);z-index:30}
+  .sheet.show{display:flex}
+  .panel{width:100%;max-width:340px;background:var(--soft);border-radius:var(--r-xl);padding:var(--s6);box-shadow:var(--sh2);text-align:center}
+  .panel h2{font-family:var(--disp);font-size:24px;margin:0 0 var(--s2);color:var(--plum-deep)}
+  .panel p{font-size:13px;color:var(--plum-deep);margin:0 0 var(--s4);line-height:1.5}
+  .panel .again{appearance:none;border:0;cursor:pointer;font-family:var(--disp);font-size:16px;background:var(--amber);color:#4a2c10;padding:11px var(--s6);border-radius:999px;display:block;width:100%;margin-bottom:var(--s2);box-shadow:var(--sh1)}
+  .panel .ghostbtn{appearance:none;border:1px solid rgba(95,76,87,.25);cursor:pointer;font-family:var(--body);font-weight:600;font-size:14px;background:transparent;color:var(--plum);padding:9px 18px;border-radius:999px;display:block;width:100%;box-sizing:border-box;text-decoration:none;margin-bottom:var(--s2)}
+  .panel .ghostbtn:last-child{margin-bottom:0}
+  /* Landscape / short viewports: squeeze the chrome so the sky fills the screen */
+  @media (orientation:landscape) and (max-height:620px){
+    .wrap{padding:3px 6px;gap:3px;max-width:100%}
+    .topbar{min-height:22px} .title{font-size:17px}
+    .iconbtn{width:25px;height:25px;font-size:14px}
+    .modepill{font-size:11.5px;padding:3px 8px}
+    .facts,.rotate{display:none}
+    .controls{padding:2px 0}
+    .stickpad{width:86px;height:58px;font-size:11px}
+    .ctl.thrbtn{width:52px;height:28px;font-size:12px}
+    .ctl.fire.big{width:62px;height:62px;font-size:16px}
+  }
+  @media (prefers-reduced-motion: reduce){ *{transition:none!important;animation:none!important} }
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <header class="topbar">
+      <h1 class="title">BOTBURNER</h1>
+      <div class="modebar" role="tablist" aria-label="Play mode">
+        <button class="modepill active" id="modeFree" type="button" role="tab">Free</button>
+        <button class="modepill" id="modePaid" type="button" role="tab">Paid · 25</button>
+      </div>
+      <button class="iconbtn" id="restartBtn" aria-label="Restart" title="Restart (R)">⟲</button>
+      <button class="iconbtn" id="infoBtn" aria-label="How to play">ⓘ</button>
+    </header>
+
+    <div class="testBanner hidden" id="testBanner">🧪 TEST MODE — local validator, fake $OIL. No real value moves.</div>
+
+    <div class="walletbar" id="walletbar">
+      <div class="walletrow">
+        <span class="lbl">Paid — 25 OIL entry · fun leaderboard, not verified</span>
+        <button class="connect-btn" id="connectBtn" type="button">Connect</button>
+      </div>
+      <div class="wallet-status hidden" id="walletStatus"></div>
+    </div>
+
+    <div class="facts" id="facts">
+      <span>Free to play</span><span class="dot-sep">·</span>
+      <span>wallet-free</span><span class="dot-sep">·</span>
+      <span><b>pays nothing</b></span>
+    </div>
+
+    <div class="rotate">↻ Rotate to landscape for the full sky</div>
+
+    <div class="hud" aria-live="polite">
+      <div><span class="lab">SCORE </span><span class="val" id="score">000000</span></div>
+      <div><span class="lab">TIME </span><span class="val" id="stat1">0</span></div>
+      <div><span class="lab">LIVES </span><span class="lives" id="lives"></span></div>
+    </div>
+
+    <main class="surface">
+      <canvas id="game" width="600" height="400" aria-label="BOTBURNER play area — a behind-the-jet sky chase."></canvas>
+    </main>
+
+    <div class="controls twothumb" aria-label="Controls">
+      <div class="stickpad" id="stickPad" role="img"
+           aria-label="Flight stick — drag here or on the play area to fly. Arrow keys also fly."><span>DRAG<br>TO FLY</span></div>
+      <div class="cluster act">
+        <div class="thr">
+          <button class="ctl thrbtn" id="btnBurn" type="button" aria-label="Speed up, double-tap and hold for afterburner">BURN</button>
+          <button class="ctl thrbtn" id="btnSlow" type="button" aria-label="Slow down">SLOW</button>
+        </div>
+        <button class="ctl fire big" id="btnFire" type="button" aria-label="Fire missiles">FIRE</button>
+      </div>
+    </div>
+
+    <footer class="foot">
+      <div class="tag">a FinnBots game</div>
+      <div class="links">
+        <a href="https://magiceden.io/marketplace/finnbot" target="_blank" rel="noopener">Buy a Bot</a>·
+        <a href="https://games.finnstergram.com/" target="_blank" rel="noopener">More games</a>·
+        <a href="https://botburner.finnstergram.com/leaderboard.html" target="_blank" rel="noopener">Leaderboard</a>
+      </div>
+    </footer>
+  </div>
+
+  <!-- Rules overlay (auto-opens as an intro on first load) -->
+  <div class="overlay" id="rulesOverlay" role="dialog" aria-modal="true" aria-labelledby="rulesTitle">
+    <div class="card">
+      <h2 id="rulesTitle">HOW TO PLAY</h2>
+      <ul class="rules">
+        <li><b>Fly 23 stages</b> to the enemy relay and bring Bot 106 home.</li>
+        <li><b>Drag the canvas or the stick pad</b> to fly (arrows / WASD too).</li>
+        <li>The <b>cannon fires itself</b> — it only bites up close.</li>
+        <li>Hold a bogey in the sight until the <b>lock box</b> shows, then <b>FIRE</b> a missile salvo. Fired without a lock, it misses. <b>50 missiles</b>, cap 100 — the tanker tops you up.</li>
+        <li><b>BURN</b> speeds up (double-tap and hold for the afterburner); <b>SLOW</b> throttles back.</li>
+        <li><b>Flick the stick hard left↔right to barrel roll</b> — it shakes a missile off your tail.</li>
+        <li>On your six: <b>THE ENEMY!</b> — slow down and he overshoots into your guns. <b>BE CAREFUL!</b> — burn, slow or roll, but never slow once it is on top of you.</li>
+        <li>Stages <b>8 and 17</b> are canyon runs: <b>guns only</b>, thread the granite, flatten the antennas.</li>
+        <li>Aircraft <b>2,500</b> · missile shot down <b>800</b> · staying alive <b>125/sec</b> · stage bonus <b>kills over the last three stages × 20,000</b> · a new plane at <b>5,000,000</b> and <b>15,000,000</b>.</li>
+        <li><b>3 planes.</b> Lose them all and the run ends — score ranks on the leaderboard.</li>
+      </ul>
+      <p class="safe">Free play never touches a wallet, never asks for a seed phrase, and never moves a Bot.</p>
+      <div class="lnks">
+        <a href="https://magiceden.io/marketplace/finnbot" target="_blank" rel="noopener">Buy a Bot</a>·
+        <a href="https://games.finnstergram.com/" target="_blank" rel="noopener">More games</a>·
+        <a href="https://botburner.finnstergram.com/leaderboard.html" target="_blank" rel="noopener">Leaderboard</a>
+      </div>
+      <button class="btn" id="rulesClose">Got it</button>
+    </div>
+  </div>
+
+  <!-- Game-over overlay (FREE) -->
+  <div class="overlay" id="overOverlay" role="dialog" aria-modal="true" aria-labelledby="overTitle">
+    <div class="card" id="overCard">
+      <h2 id="overTitle">RUN OVER</h2>
+      <div class="big">SCORE <span id="oScore">0</span></div>
+      <p>Stage <b id="oStage">1/23</b> · Hits <b id="oHits">0</b> · Time <b id="oTime">0:00</b></p>
+      <button class="btn" id="retryBtn">Tap to retry</button>
+    </div>
+  </div>
+
+  <!-- Paid overlay (start/run-over card; innerHTML written by the Paid controller) -->
+  <div class="overlay" id="paidOverlay" role="dialog" aria-modal="true"></div>
+
+  <!-- Kid-safety confirm gate (before any wallet code runs) -->
+  <div class="sheet" id="confirmSheet"><div class="panel">
+    <h2>Play BOTBURNER — Paid</h2>
+    <p>One entry = one run. Costs <b>25 OIL</b> to the treasury (a sink). Pays nothing out — you're playing for a leaderboard spot. Bot holders: score ×1.5.<br/><br/>A <b>fun ranking</b> — not verified.</p>
+    <button class="again" id="confirmEnter" type="button">Connect &amp; Pay</button>
+    <button class="ghostbtn" id="confirmBack" type="button">Cancel</button>
+  </div></div>
+
+  <!-- Score-posted sheet -->
+  <div class="sheet" id="postedSheet"><div class="panel">
+    <h2>Score posted!</h2>
+    <p id="posted-text"></p>
+    <a class="ghostbtn" id="viewLb" href="https://botburner.finnstergram.com/leaderboard.html" target="_blank" rel="noopener">View leaderboard →</a>
+    <button class="again" id="againBtn" type="button">Play again (25 OIL)</button>
+  </div></div>
+
+<script>
+"use strict";
+/* ==========================================================================
+   BOTBURNER — FinnBots.  ENGINE (Free gameplay).
+   An After Burner II-loop sky chase. The TOY is cloned to the arcade's numbers
+   (see BRIEF-botburner.md for the researched fidelity table + sources); every
+   pixel and name is original FinnBots art. Hero: Bot 106 in the FB-106 EMBER.
+
+   The whole world + physics live on the run state `s` with NO DOM, exported
+   under HEADLESS so VERIFY can require() and drive it (BOTRUN pattern).
+   ========================================================================== */
+
+const CFG = { name:'BOTBURNER', memoNS:'BURN', chassis:'sink-leaderboard',
+              subdomain:'botburner.finnstergram.com', port:9026, hero:106,
+              accent:'#f2a03d', entryOIL:25, scorePost:1 };
+
+/* ---- render frame (landscape 16:9) --------------------------------------- */
+const W = 480, H = 270;
+const RUN = { w:W, h:H };
+const HORIZON = 116;            // sky/ground split at zero pitch
+
+/* ---- projection ---------------------------------------------------------- */
+const FOCAL   = 360;            // 1/tan(fov/2) * (W/2)
+const NEAR    = 26;             // nothing is drawn nearer than this
+const CAM_LAT = 112;            // how far the world pans when you bank
+const CAM_VRT = 56;
+const PL_X    = 150;            // player sprite travel on screen (px)
+const PL_Y    = 50;
+const PL_Y0   = 198;            // player sprite resting height
+const RET_X   = 96;             // gunsight travel (px) — the nose converges inboard
+const RET_Y   = 34;
+const RET_Y0  = 150;
+
+/* ---- flight -------------------------------------------------------------- */
+const BASE_SPD = 520;           // world units/sec at cruise
+const THR = { slow:0.62, cruise:1.0, fast:1.35, burner:1.9 };
+const STICK_RATE = 3.1;         // how fast the stick follows input (per sec)
+const ROLL_WIN   = 260;         // ms: stick flip window that triggers a roll
+const ROLL_TRIP  = 0.55;        // stick magnitude either side of the flip
+const ROLL_TIME  = 900;         // ms a barrel roll lasts (you cannot manoeuvre)
+
+/* ---- guns ---------------------------------------------------------------- */
+const VULCAN_RANGE = 460;       // short — the arcade cannon only bites up close
+const VULCAN_CD    = 90;        // ms between rounds
+const VULCAN_BOX   = 30;        // px half-width of the cannon cone at the sight
+const LOCK_BOX_X   = 46;        // px half-width of the missile lock box
+const LOCK_BOX_Y   = 34;
+const LOCK_ZMIN    = 120, LOCK_ZMAX = 1500;
+const MAX_LOCKS    = 6;         // the arcade salvo — sweep the sight, fire a burst
+const MSL_FLIGHT   = 520;       // ms a player missile flies before it kills
+
+/* ---- arcade scoring (researched — see BRIEF) ----------------------------- */
+const PTS_AIRCRAFT = 2500;
+const PTS_MISSILE  = 800;
+const PTS_GROUND   = 2500;
+const BONUS_PER_KILL = 20000;   // x kills over the previous three stages
+const PTS_PER_SEC  = 125;
+const EXTRA_AT     = [5000000, 15000000];
+
+/* ---- stores -------------------------------------------------------------- */
+const MSL_START = 50, MSL_CAP = 100, MSL_REFUEL = 50;
+const LIVES     = 3;
+
+/* ---- threat windows ------------------------------------------------------ */
+const SHADOW_FROM = 6;          // "The Enemy!" gun-tail first appears in stage 6
+const SPIKE_FROM  = 9;          // "Be Careful!" rear heat-seeker from stage 9
+const SHADOW_FUSE = 3400;       // ms before his cannon connects
+const SPIKE_FUSE  = 2800;       // ms before the heat-seeker connects
+const RESPAWN_MS  = 1800;       // invulnerable while you rejoin
+
+/* ==========================================================================
+   STAGES — the arcade's 23-stage shape: 5 / 13 refuel, 8 / 17 canyon runs,
+   23 the autopilot landing. Skies are ours (FinnBots palette), not the original's.
+   ========================================================================== */
+const SKIES = [
+  { sky:['#3a6ff7','#8fc4ff'], grd:['#1d3f7a','#2b5ea8'], kind:'sea'   },
+  { sky:['#1d7a6b','#7fd9c2'], grd:['#0f4a44','#1a6f63'], kind:'sea'   },
+  { sky:['#241a33','#5f4c57'], grd:['#141024','#2a2140'], kind:'sea'   },
+  { sky:['#3a6ff7','#bcd9ff'], grd:['#2d6b3a','#4f9a55'], kind:'land'  },
+  { sky:['#f2a03d','#f5c8a0'], grd:['#7a4a2a','#a8703f'], kind:'land'  },
+  { sky:['#5f4c57','#c9a0c8'], grd:['#3e323a','#6b5560'], kind:'cloud' },
+  { sky:['#0f2a5a','#3a6ff7'], grd:['#123a52','#1d6f82'], kind:'cloud' },
+  { sky:['#8a2f3a','#f2a03d'], grd:['#5a2420','#8f4430'], kind:'land'  },
+  { sky:['#2a5f8a','#a8d8f0'], grd:['#4a6b2d','#7aa84f'], kind:'land'  },
+  { sky:['#6b3a7a','#f5a0c8'], grd:['#3a2a4a','#6b4a7a'], kind:'land'  },
+];
+function skyOf(n){ return SKIES[(n-1) % SKIES.length]; }
+
+const CANYON_STAGES = [8, 17];
+const REFUEL_STAGES = [5, 13];
+const LAND_STAGE    = 23;
+const LAST_STAGE    = 23;
+
+function stageKind(n){
+  if(n === LAND_STAGE) return 'land';
+  if(REFUEL_STAGES.indexOf(n) >= 0) return 'refuel';
+  if(CANYON_STAGES.indexOf(n) >= 0) return 'canyon';
+  return 'combat';
+}
+// stage length in world units (combat ~34s at cruise; canyons are a fast dash)
+function stageDist(n){
+  const k = stageKind(n);
+  if(k === 'refuel') return 3200;
+  if(k === 'land')   return 4200;
+  if(k === 'canyon') return 14000;
+  return 17000 + Math.min(n, 20) * 260;
+}
+const STAGES = (function(){ const a=[]; for(let n=1;n<=LAST_STAGE;n++)
+  a.push({ n:n, kind:stageKind(n), dist:stageDist(n), sky:skyOf(n) }); return a; })();
+
+/* ---- the nine documented enemy formations (shapes only — gameplay, not art) */
+const FORMS = [
+  { id:1, split:false, at:[[-1.5,0],[-0.5,0],[0.5,0],[1.5,0]] },                         // line of 4
+  { id:2, split:false, at:[[-1.5,-0.9],[-0.5,-0.3],[0.5,0.3],[1.5,0.9]] },               // diagonal
+  { id:3, split:false, at:[[-1.8,-1.0],[1.8,-1.0],[-0.9,-0.4],[0.9,-0.4],
+                           [-0.4,0],[0,0],[0.4,0],
+                           [-0.9,0.4],[0.9,0.4],[-1.8,1.0],[1.8,1.0]] },                 // big X
+  { id:4, split:false, at:[[0,-0.7],[-0.8,0],[0.8,0],[0,0.7]] },                         // diamond
+  { id:5, split:false, at:[[-1.8,-0.8],[1.8,-0.8],
+                           [-1.5,0.3],[-0.9,0.3],[-0.3,0.3],[0.3,0.3],[0.9,0.3],[1.5,0.3]] },
+  { id:6, split:false, at:[[-0.4,-0.8],[0.4,-0.8],[-0.9,-0.3],[0.9,-0.3],
+                           [-0.9,0.3],[0.9,0.3],[-0.4,0.8],[0.4,0.8]] },                 // box
+  { id:7, split:true,  at:[[0,0],[0,0],[0,0],[0,0]] },                                   // column that splits
+  { id:8, split:false, at:[[-2.1,0],[-1.5,0],[-0.9,0],[-0.3,0],[0.3,0],[0.9,0],[1.5,0],[2.1,0]] },
+  { id:9, split:false, at:[[-1.2,-0.6],[-1.2,0],[-1.2,0.6],[1.2,-0.6],[1.2,0],[1.2,0.6]] },
+];
+
+/* ---- bogey roster (ours; behaviour + intro stage are the arcade's) -------- */
+const BOGEY = {
+  drifter:{ hp:1, fires:false, from:1,  spd:  40, peel:1.0 },   // harmless striped single-burner
+  hauler: { hp:2, fires:true,  from:1,  spd:  10, peel:0.3 },   // heavy large-bottom bomber
+  sliver: { hp:1, fires:true,  from:2,  spd:  70, peel:0.6 },   // thin, agile, weaves
+  rotor:  { hp:1, fires:true,  from:3,  spd:-120, peel:0.1 },   // chopper, hangs on the screen edge
+};
+
+/* ---- deterministic RNG (BOTRUN pattern) ---------------------------------- */
+function mkRng(seed){ let a = seed>>>0; return function(){ a=(a*1664525+1013904223)>>>0; return a/4294967296; }; }
+function clamp(v,a,b){ return v<a?a:(v>b?b:v); }
+
+/* ==========================================================================
+   RUN STATE
+   ========================================================================== */
+function newRun(){
+  const s = {
+    phase:'play', score:0, lives:LIVES, hits:0, ground:0, timeMs:0, timeLeft:0,
+    stage:1, stageKind:'combat', stageDist:0, stageLen:stageDist(1), dist:0,
+    missiles:MSL_START, throttle:'cruise', spd:THR.cruise, burner:false,
+    // flight
+    px:0, py:0, tx:0, ty:0, roll:0, rollT:0, rollDir:0,
+    stickPrev:0, stickFlipT:-1e9, stickStrongT:-1e9, burnTapT:-1e9, burnDbl:false,
+    // guns
+    vulcanCd:0, locks:[], myMsl:[], firePrev:false, burnPrev:false,
+    // world
+    bog:[], msl:[], obst:[], fx:[],
+    tail:{ kind:null, t:0, x:0, shakeT:0 },
+    // pacing
+    waveT:900, waveN:0, killsByStage:[0,0,0],
+    invuln:0, nextExtra:0, bonusShown:0,
+    // cosmetics the renderer reads
+    flash:0, shake:0, msg:'', msgT:0, dock:0, refuelled:false,
+    rng:null, seed:0x5eed1ce,
+    // inputs (written by the DOM layer or a test harness)
+    inX:0, inY:0, inFire:false, inBurn:false, inSlow:false, inBurnerReq:false,
+  };
+  s.rng = mkRng(s.seed);
+  enterStage(s, 1);
+  return s;
+}
+
+function say(s, text, ms){ s.msg = text; s.msgT = ms || 1500; }
+
+function enterStage(s, n){
+  s.stage = n;
+  s.stageKind = stageKind(n);
+  s.stageLen = stageDist(n);
+  s.stageDist = 0;
+  s.bog.length = 0; s.msl.length = 0; s.obst.length = 0;
+  s.tail.kind = null; s.tail.t = 0;
+  s.locks.length = 0; s.myMsl.length = 0;
+  s.waveN = 0; s.waveT = s.stageKind === 'combat' ? 900 : 600;
+  s.dock = 0; s.refuelled = false;
+  // stage bonus: aircraft downed over the PREVIOUS THREE stages x 20,000
+  if(n > 1){
+    const k = s.killsByStage[0] + s.killsByStage[1] + s.killsByStage[2];
+    if(k > 0){ s.score += k * BONUS_PER_KILL; s.bonusShown = k * BONUS_PER_KILL; }
+    else s.bonusShown = 0;
+  }
+  s.killsByStage.unshift(0); s.killsByStage.length = 3;
+  if(s.stageKind === 'canyon'){ buildCanyon(s); say(s, 'CANYON RUN — GUNS ONLY', 2200); }
+  else if(s.stageKind === 'refuel'){ say(s, 'TANKER INBOUND', 2000); }
+  else if(s.stageKind === 'land'){ say(s, 'AUTOPILOT — BRINGING HER HOME', 2600); }
+  else say(s, 'STAGE ' + n, 1600);
+}
+
+/* ---- canyon: pillars to thread, antennas + shelters to flatten ------------ */
+function buildCanyon(s){
+  const r = s.rng; let z = 1800;
+  while(z < s.stageLen + 900){
+    const roll = r();
+    if(roll < 0.44){
+      // a granite pillar on one side of the corridor
+      const side = r() < 0.5 ? -1 : 1;
+      s.obst.push({ kind:'pillar', x:side*(66+r()*54), y:-40, z:z, w:26, h:170, hp:0, alive:true });
+    } else if(roll < 0.74){
+      s.obst.push({ kind:'antenna', x:(r()*2-1)*74, y:-58, z:z, w:14, h:96, hp:1, alive:true });
+    } else {
+      s.obst.push({ kind:'shelter', x:(r()*2-1)*82, y:-74, z:z, w:34, h:34, hp:2, alive:true });
+    }
+    z += 540 + r()*380;
+  }
+}
+
+/* ==========================================================================
+   STEP
+   ========================================================================== */
+function stepGame(s, dtMs){
+  const ev = {};
+  if(s.phase !== 'play') return ev;
+  const dt = dtMs / 1000;
+  s.timeMs += dtMs;
+
+  // ---- staying alive pays, as in the arcade (~125/sec) ----
+  s.score += PTS_PER_SEC * dt;
+  checkExtra(s, ev);
+
+  if(s.msgT > 0) s.msgT -= dtMs;
+  if(s.flash > 0) s.flash -= dtMs;
+  if(s.shake > 0) s.shake -= dtMs;
+  if(s.invuln > 0) s.invuln -= dtMs;
+
+  stepThrottle(s, dtMs);
+  stepStick(s, dtMs);
+
+  const playable = (s.stageKind === 'combat' || s.stageKind === 'canyon');
+
+  // ---- forward motion ----
+  const adv = BASE_SPD * s.spd * dt;
+  s.dist += adv; s.stageDist += adv;
+
+  if(s.stageKind === 'combat'){
+    stepWaves(s, dtMs);
+    stepBogeys(s, dtMs, adv, ev);
+    stepEnemyMissiles(s, dtMs, adv, ev);
+    stepTail(s, dtMs, ev);
+  } else if(s.stageKind === 'canyon'){
+    stepCanyon(s, dtMs, adv, ev);
+  } else if(s.stageKind === 'refuel'){
+    stepRefuel(s, dtMs, ev);
+  }
+
+  if(playable){
+    stepVulcan(s, dtMs, ev); stepLocks(s);
+    if(s.inFire && !s.firePrev) fireMissiles(s, ev);
+    stepMyMissiles(s, dtMs, ev);
+  } else { s.locks.length = 0; }
+  s.firePrev = s.inFire;
+
+  stepFx(s, dtMs);
+
+  // ---- stage advance is gated on actually flying the stage out ----
+  if(s.stageDist >= s.stageLen){
+    if(s.stage >= LAST_STAGE){ s.phase = 'won'; ev.over = true; return ev; }
+    enterStage(s, s.stage + 1);
+    ev.stage = true;
+  }
+  return ev;
+}
+
+/* ---- throttle: slow / cruise / fast, and the double-tap afterburner ------- */
+function stepThrottle(s, dtMs){
+  // rising edge on BURN: a second tap inside 340ms lights the burner. The DOM layer
+  // detects it on real event timestamps (inBurnerReq) because a 60Hz tick can straddle
+  // a quick tap; this edge check is the headless fallback.
+  if(s.inBurn && !s.burnPrev){
+    if(s.timeMs - s.burnTapT < 340) s.burnDbl = true;
+    s.burnTapT = s.timeMs;
+  }
+  if(!s.inBurn) s.burnDbl = false;
+  s.burnPrev = s.inBurn;
+  s.burner = !!(s.inBurn && (s.burnDbl || s.inBurnerReq));
+
+  let want = 'cruise';
+  if(s.inBurn) want = s.burner ? 'burner' : 'fast';
+  else if(s.inSlow) want = 'slow';
+  s.throttle = want;
+  const target = THR[want];
+  // the airframe takes a moment to answer the throttle
+  const rate = (target > s.spd ? 1.5 : 2.2) * dtMs / 1000;
+  s.spd += clamp(target - s.spd, -rate, rate);
+}
+
+/* ---- stick: follows input, except mid-roll; a hard flip starts a roll ----- */
+function stepStick(s, dtMs){
+  if(s.rollT > 0){
+    s.rollT -= dtMs;
+    s.roll = s.rollDir * (1 - s.rollT / ROLL_TIME) * Math.PI * 2;
+    if(s.rollT <= 0){ s.roll = 0; s.rollT = 0; }
+    return;                                  // you cannot manoeuvre while rolling
+  }
+  const nx = clamp(s.inX, -1, 1), ny = clamp(s.inY, -1, 1);
+  // roll trigger: the arcade command — stick slammed hard from one side to the other
+  if(Math.abs(nx) > ROLL_TRIP){
+    if(s.stickPrev * nx < 0 && Math.abs(s.stickPrev) > ROLL_TRIP &&
+       (s.timeMs - s.stickStrongT) < ROLL_WIN && (s.timeMs - s.stickFlipT) > ROLL_TIME){
+      s.rollT = ROLL_TIME; s.rollDir = nx > 0 ? 1 : -1; s.stickFlipT = s.timeMs;
+      if(s.tail.kind === 'spike'){ s.tail.kind = null; s.tail.t = 0; say(s, 'SHAKEN OFF', 1100); }
+    }
+    s.stickPrev = nx; s.stickStrongT = s.timeMs;
+  }
+  const k = clamp(STICK_RATE * dtMs / 1000, 0, 1);
+  s.px += (nx - s.px) * k;
+  s.py += (ny - s.py) * k;
+  s.roll += (clamp(nx, -1, 1) * 0.34 - s.roll) * k;   // bank into the turn
+}
+
+/* ---- waves ---------------------------------------------------------------- */
+function stageHeat(n){ return clamp(0.26 + n * 0.035, 0.26, 0.92); }   // fire probability
+function typesFor(n){
+  const t = [];
+  for(const k in BOGEY) if(n >= BOGEY[k].from) t.push(k);
+  return t;
+}
+function stepWaves(s, dtMs){
+  s.waveT -= dtMs;
+  if(s.waveT > 0) return;
+  const r = s.rng, n = s.stage;
+  const f = FORMS[Math.floor(r() * FORMS.length)];
+  const types = typesFor(n);
+  const heat = stageHeat(n);
+  const z0 = 2300 + r() * 500;
+  const spread = 62 + r() * 34;
+  const cx = (r() * 2 - 1) * 46, cy = (r() * 2 - 1) * 26;
+  if(f.split){
+    // the arcade's column: a line of planes nose-to-tail that fans out late
+    const cnt = 3 + Math.floor(r() * 2);
+    for(let i = 0; i < cnt; i++){
+      const t = types[Math.floor(r() * types.length)];
+      s.bog.push(mkBogey(s, t, cx, cy, z0 + i * 300, heat, true));
+    }
+  } else {
+    for(let i = 0; i < f.at.length; i++){
+      const t = types[Math.floor(r() * types.length)];
+      s.bog.push(mkBogey(s, t, cx + f.at[i][0] * spread, cy + f.at[i][1] * spread * 0.62,
+                         z0 + (r() * 140 - 70), heat, false));
+    }
+  }
+  s.waveN++;
+  // stages get denser as the mission wears on
+  s.waveT = Math.max(900, 2600 - n * 62) + r() * 700;
+  // rear threats: "The Enemy!" from stage 6, "Be Careful!" from stage 9
+  if(!s.tail.kind && s.stageDist > 2600){
+    if(n >= SPIKE_FROM && r() < 0.24){ s.tail.kind = 'spike'; s.tail.t = 0; say(s, 'BE CAREFUL!', 1400); }
+    else if(n >= SHADOW_FROM && r() < 0.24){ s.tail.kind = 'shadow'; s.tail.t = 0; s.tail.x = (r()*2-1)*0.5; say(s, 'THE ENEMY!', 1400); }
+  }
+}
+function mkBogey(s, t, x, y, z, heat, column){
+  const d = BOGEY[t], r = s.rng;
+  const b = { t:t, x:x, y:y, z:z, hp:d.hp, alive:true, peeled:false, column:column,
+              fireZ: d.fires && r() < heat ? 520 + r() * 680 : -1,
+              weave: t === 'sliver' ? (r() * 2 - 1) * 26 : 0,
+              side: r() < 0.5 ? -1 : 1, born:s.timeMs };
+  if(t === 'rotor'){ b.x = (r() < 0.5 ? -1 : 1) * (120 + r() * 50); b.y = 10 + r() * 40; }
+  return b;
+}
+
+/* ---- bogeys --------------------------------------------------------------- */
+function stepBogeys(s, dtMs, adv, ev){
+  const dt = dtMs / 1000;
+  for(let i = s.bog.length - 1; i >= 0; i--){
+    const b = s.bog[i], d = BOGEY[b.t];
+    b.z -= adv + d.spd * dt;
+    if(b.t === 'sliver') b.x += Math.sin((s.timeMs - b.born) / 420) * b.weave * dt;
+    // the column fans out just before it reaches you
+    if(b.column && !b.peeled && b.z < 700){ b.peeled = true; b.x += b.side * (60 + s.rng() * 50); }
+    // everyone peels off the moment they pass
+    if(b.z < 260 && !b.peeled){ b.peeled = true; b.x += b.side * d.peel * 120; b.y -= d.peel * 30; }
+    // fire a missile once, at its scripted range, aimed where you are RIGHT NOW
+    if(b.fireZ > 0 && b.z <= b.fireZ){
+      b.fireZ = -1;
+      s.msl.push({ x:b.x, y:b.y, z:b.z, aimX:s.px, aimY:s.py, t:0,
+                   fuse: 900 + (b.z / BASE_SPD) * 900, alive:true });
+    }
+    if(b.z < NEAR){ s.bog.splice(i, 1); }
+  }
+}
+
+/* ---- enemy missiles: they fly at where you were, so you sidestep them ----- */
+function stepEnemyMissiles(s, dtMs, adv, ev){
+  for(let i = s.msl.length - 1; i >= 0; i--){
+    const m = s.msl[i];
+    m.t += dtMs;
+    m.z -= adv * 1.45 + 260 * dtMs / 1000;
+    if(m.z <= NEAR){
+      // a hit unless you moved out of the way (or are mid-roll / just respawned)
+      const dx = Math.abs(s.px - m.aimX), dy = Math.abs(s.py - m.aimY);
+      const dodged = (dx > 0.34 || dy > 0.40);
+      s.msl.splice(i, 1);
+      if(!dodged){ hitPlayer(s, ev); break; }   // a hit clears the sky — stop walking the list
+      boom(s, m.x, m.y, 40, 'near', 150);
+    }
+  }
+}
+
+/* ---- rear threats --------------------------------------------------------- */
+function stepTail(s, dtMs, ev){
+  const T = s.tail;
+  if(!T.kind) return;
+  T.t += dtMs;
+  const fast = (s.throttle === 'fast' || s.throttle === 'burner');
+  const slow = (s.throttle === 'slow');
+  if(T.kind === 'shadow'){
+    // outrunning him shakes him; throttling back makes him overshoot into your guns
+    if(slow && T.t > 700){
+      T.kind = null; T.t = 0;
+      s.bog.push(mkBogey(s, 'drifter', s.px * 40, s.py * 26, 900, 0, false));
+      say(s, 'HE OVERSHOT — GUNS!', 1400);
+      return;
+    }
+    if(fast && T.t > 900){ T.kind = null; T.t = 0; say(s, 'SHAKEN OFF', 1100); return; }
+    if(T.t >= SHADOW_FUSE){ T.kind = null; T.t = 0; hitPlayer(s, ev); }
+  } else if(T.kind === 'spike'){
+    // speed up or slow down shakes it — but never slow down once it is on top of you
+    if(T.t >= SPIKE_FUSE){ T.kind = null; T.t = 0; hitPlayer(s, ev); return; }
+    const close = T.t > SPIKE_FUSE - 700;
+    if(slow && close){ T.kind = null; T.t = 0; hitPlayer(s, ev); return; }
+    if((fast || slow) && T.t > 600){ T.kind = null; T.t = 0; say(s, 'SHAKEN OFF', 1100); }
+  }
+}
+
+/* ---- canyon --------------------------------------------------------------- */
+function stepCanyon(s, dtMs, adv, ev){
+  const CORRIDOR = 128;
+  for(let i = s.obst.length - 1; i >= 0; i--){
+    const o = s.obst[i];
+    o.z -= adv;
+    if(o.z < NEAR){
+      if(o.alive){
+        // you are where the stick says you are; the corridor is unforgiving
+        const wx = s.px * CAM_LAT, wy = s.py * CAM_VRT;
+        const hitX = Math.abs(wx - o.x) < (o.w + 18);
+        const hitY = (o.kind === 'pillar') ? true : (wy < o.y + o.h + 16);
+        if(hitX && hitY){ boom(s, o.x, o.y, 70, 'big', 120); hitPlayer(s, ev); }
+      }
+      s.obst.splice(i, 1);
+      continue;
+    }
+  }
+  if(Math.abs(s.px) >= 0.97 && s.invuln <= 0 && s.rollT <= 0){
+    boom(s, s.px * CAM_LAT, 0, 60, 'big', 120); hitPlayer(s, ev);
+  }
+}
+
+/* ---- refuel: non-playable, the OIL tanker tops you up --------------------- */
+function stepRefuel(s, dtMs, ev){
+  s.dock += dtMs;
+  s.px += (0 - s.px) * clamp(dtMs / 500, 0, 1);
+  s.py += (0 - s.py) * clamp(dtMs / 500, 0, 1);
+  if(s.dock > 2400 && !s.refuelled){
+    s.refuelled = true;
+    s.missiles = Math.min(MSL_CAP, s.missiles + MSL_REFUEL);
+    say(s, 'ARMED — ' + s.missiles + ' MISSILES', 2000);
+    ev.refuel = true;
+  }
+}
+
+/* ---- the cannon: unlimited, auto-firing, and only bites up close ---------- */
+function stepVulcan(s, dtMs, ev){
+  s.vulcanCd -= dtMs;
+  if(s.vulcanCd > 0 || s.rollT > 0) return;
+  s.vulcanCd = VULCAN_CD;
+  const rx = retX(s), ry = retY(s);
+  // enemy missiles are fair game — 800 a piece
+  for(let i = s.msl.length - 1; i >= 0; i--){
+    const m = s.msl[i];
+    if(m.z > VULCAN_RANGE || m.z < NEAR) continue;
+    const p = project(s, m.x, m.y, m.z);
+    if(Math.abs(p.x - rx) < VULCAN_BOX && Math.abs(p.y - ry) < VULCAN_BOX){
+      s.msl.splice(i, 1); s.score += PTS_MISSILE; s.hits++;
+      boom(s, m.x, m.y, 26, 'small', m.z); ev.gun = true; checkExtra(s, ev); return;
+    }
+  }
+  for(let i = 0; i < s.bog.length; i++){
+    const b = s.bog[i];
+    if(!b.alive || b.z > VULCAN_RANGE || b.z < NEAR) continue;
+    const p = project(s, b.x, b.y, b.z);
+    if(Math.abs(p.x - rx) < VULCAN_BOX && Math.abs(p.y - ry) < VULCAN_BOX){
+      b.hp--; ev.gun = true;
+      if(b.hp <= 0) killBogey(s, i, ev);
+      return;
+    }
+  }
+  // canyon structures go down to the cannon too
+  for(let i = 0; i < s.obst.length; i++){
+    const o = s.obst[i];
+    if(!o.alive || o.hp <= 0 || o.z > VULCAN_RANGE * 1.35 || o.z < NEAR) continue;
+    const p = project(s, o.x, o.y + o.h / 2, o.z);
+    if(Math.abs(p.x - rx) < VULCAN_BOX + 12 && Math.abs(p.y - ry) < VULCAN_BOX + 22){
+      o.hp--; ev.gun = true;
+      if(o.hp <= 0){ o.alive = false; s.score += PTS_GROUND; s.ground++; s.hits++;
+                     boom(s, o.x, o.y + o.h / 2, 54, 'big', o.z); checkExtra(s, ev); }
+      return;
+    }
+  }
+}
+
+/* ---- lock-on: sweep the sight, lock a salvo ------------------------------- */
+function stepLocks(s){
+  s.locks.length = 0;
+  if(s.stageKind === 'canyon' || s.rollT > 0) return;   // no missiles in the canyon
+  const rx = retX(s), ry = retY(s);
+  for(let i = 0; i < s.bog.length && s.locks.length < MAX_LOCKS; i++){
+    const b = s.bog[i];
+    if(!b.alive || b.z < LOCK_ZMIN || b.z > LOCK_ZMAX) continue;
+    const p = project(s, b.x, b.y, b.z);
+    if(Math.abs(p.x - rx) < LOCK_BOX_X && Math.abs(p.y - ry) < LOCK_BOX_Y) s.locks.push(i);
+  }
+}
+function fireMissiles(s, ev){
+  if(s.stageKind !== 'combat' || s.missiles <= 0 || s.rollT > 0) return;
+  if(s.locks.length === 0){
+    // fired without a lock it always misses — the arcade's rule, and the reason you aim
+    s.missiles--; s.myMsl.push({ tgt:-1, t:0 }); ev.fire = true; return;
+  }
+  for(let i = 0; i < s.locks.length && s.missiles > 0; i++){
+    s.missiles--;
+    s.myMsl.push({ tgt:s.bog[s.locks[i]], t:0 });
+  }
+  ev.fire = true;
+}
+function stepMyMissiles(s, dtMs, ev){
+  for(let i = s.myMsl.length - 1; i >= 0; i--){
+    const m = s.myMsl[i];
+    m.t += dtMs;
+    if(m.t < MSL_FLIGHT) continue;
+    s.myMsl.splice(i, 1);
+    if(m.tgt && m.tgt !== -1 && m.tgt.alive){
+      const idx = s.bog.indexOf(m.tgt);
+      if(idx >= 0) killBogey(s, idx, ev);
+    }
+  }
+}
+
+function killBogey(s, i, ev){
+  const b = s.bog[i];
+  b.alive = false;
+  boom(s, b.x, b.y, b.t === 'hauler' ? 62 : 44, b.t === 'hauler' ? 'big' : 'small', b.z);
+  s.bog.splice(i, 1);
+  s.score += PTS_AIRCRAFT; s.hits++; s.killsByStage[0]++;
+  ev.kill = true; checkExtra(s, ev);
+}
+
+function checkExtra(s, ev){
+  while(s.nextExtra < EXTRA_AT.length && s.score >= EXTRA_AT[s.nextExtra]){
+    s.nextExtra++; s.lives++; ev.extra = true; say(s, 'NEW PLANE!', 2000);
+  }
+}
+
+function hitPlayer(s, ev){
+  if(s.invuln > 0 || s.phase !== 'play') return;
+  s.lives--; s.flash = 420; s.shake = 700; s.invuln = RESPAWN_MS;
+  s.tail.kind = null; s.tail.t = 0;
+  s.msl.length = 0;
+  boom(s, s.px * CAM_LAT, s.py * CAM_VRT, 90, 'big', 130);
+  ev.hit = true;
+  if(s.lives <= 0){ s.lives = 0; s.phase = 'dead'; ev.over = true; }
+  else say(s, 'PLANE DOWN — ' + s.lives + ' LEFT', 1600);
+}
+
+/* ---- little explosions the renderer draws -------------------------------- */
+function boom(s, x, y, r, kind, z){ s.fx.push({ x:x, y:y, z:z || 200, r:r, t:0, life:kind === 'big' ? 620 : 380, kind:kind }); }
+function stepFx(s, dtMs){
+  for(let i = s.fx.length - 1; i >= 0; i--){ s.fx[i].t += dtMs; if(s.fx[i].t >= s.fx[i].life) s.fx.splice(i, 1); }
+}
+
+/* ---- projection helpers (pure — the render half uses these too) ---------- */
+function project(s, wx, wy, wz){
+  const z = Math.max(wz, NEAR), k = FOCAL / z;
+  return { x: W / 2 + (wx - s.px * CAM_LAT) * k,
+           y: HORIZON - (wy - s.py * CAM_VRT) * k,
+           k: k };
+}
+function retX(s){ return W / 2 + s.px * RET_X; }
+function retY(s){ return RET_Y0 - s.py * RET_Y; }
+function plX(s){ return W / 2 + s.px * PL_X; }
+function plY(s){ return PL_Y0 - s.py * PL_Y; }
+
+/* ---- headless export for VERIFY ------------------------------------------ */
+const HEADLESS = (typeof document === 'undefined');
+if(HEADLESS){ module.exports = { CFG, RUN, STAGES, FORMS, BOGEY, newRun, stepGame,
+                                 fireMissiles, project, retX, retY, plX, plY,
+                                 W:W, H:H, HORIZON:HORIZON, THR:THR }; }
+
+/* ======================= DOM / RENDER / INPUT (browser) =================== */
+if(!HEADLESS){
+(function(){
+  const cv = document.getElementById('game'), ctx = cv.getContext('2d');
+  cv.width = W; cv.height = H; ctx.imageSmoothingEnabled = false;
+  const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  let s = newRun(), active = true, prevPhase = 'play';
+
+  document.body.classList.add((RUN.w / RUN.h) < 1 ? 'is-portrait' : 'is-landscape');
+  function fitCanvas(){ const box = cv.parentElement.getBoundingClientRect();
+    const ar = RUN.w / RUN.h; let w = box.width, h = w / ar; if(h > box.height){ h = box.height; w = h * ar; }
+    cv.style.width = Math.max(80, Math.floor(w)) + 'px'; cv.style.height = Math.max(44, Math.floor(h)) + 'px'; }
+  addEventListener('resize', fitCanvas); addEventListener('orientationchange', fitCanvas);
+  fitCanvas(); setTimeout(fitCanvas, 120);
+
+  // ---- hero: the real Bot 106, keyed, riding in the canopy ----
+  const hero = new Image(); let heroOk = false;
+  hero.onload = () => { heroOk = true; }; hero.src = 'assets/hero/bot-106.png';
+
+  // ---- audio ----
+  let ac = null, muted = false;
+  function tone(f, d, type, vol){ if(reduce || muted) return; try{
+    ac = ac || new (window.AudioContext || window.webkitAudioContext)();
+    const o = ac.createOscillator(), g = ac.createGain();
+    o.type = type || 'square'; o.connect(g); g.connect(ac.destination);
+    o.frequency.value = f; g.gain.value = vol || 0.035; o.start();
+    g.gain.exponentialRampToValueAtTime(0.0001, ac.currentTime + d); o.stop(ac.currentTime + d + 0.02);
+  }catch(e){} }
+  function noise(d, vol){ if(reduce || muted) return; try{
+    ac = ac || new (window.AudioContext || window.webkitAudioContext)();
+    const n = ac.sampleRate * d, buf = ac.createBuffer(1, n, ac.sampleRate), ch = buf.getChannelData(0);
+    for(let i = 0; i < n; i++) ch[i] = (Math.random() * 2 - 1) * (1 - i / n);
+    const src = ac.createBufferSource(), g = ac.createGain();
+    src.buffer = buf; src.connect(g); g.connect(ac.destination); g.gain.value = vol || 0.07; src.start();
+  }catch(e){} }
+
+  /* ======================= PIXEL ART (all original FinnBots) ============== */
+  const PAL = { plum:'#5f4c57', deep:'#3e323a', amber:'#f2a03d', elec:'#3a6ff7',
+                peach:'#f5c8a0', soft:'#fdf3e7', teal:'#3fbfa8', mint:'#9ff0dd',
+                red:'#c0392b', rust:'#8a4a2f', steel:'#7d8a99', dark:'#221a26' };
+
+  function outlined(x, y, w, h, fill, line){
+    ctx.fillStyle = line || PAL.deep; ctx.fillRect(x - 1, y - 1, w + 2, h + 2);
+    ctx.fillStyle = fill; ctx.fillRect(x, y, w, h);
+  }
+
+  // The FB-106 EMBER, seen from astern: Bot 106 rides in the canopy.
+  function drawEmber(x, y, sz, roll, burner, ghost){
+    ctx.save(); ctx.translate(x, y); ctx.rotate(roll); ctx.scale(sz / 64, sz / 64);
+    if(ghost) ctx.globalAlpha = 0.45;
+    // exhaust first, so the airframe sits on top of it
+    const flame = burner ? 1.9 : 1.0, fl = (14 + Math.random() * 9) * flame;
+    for(const dx of [-11, 11]){
+      ctx.fillStyle = PAL.elec;   ctx.fillRect(dx - 4, 16, 8, fl);
+      ctx.fillStyle = PAL.mint;   ctx.fillRect(dx - 2, 16, 4, fl * 0.7);
+      if(burner){ ctx.fillStyle = PAL.amber; ctx.fillRect(dx - 3, 16 + fl * 0.5, 6, fl * 0.6); }
+    }
+    // wings — amber leading edge, plum underside, dark outline
+    outlined(-40, 2, 80, 8, PAL.plum);
+    ctx.fillStyle = PAL.amber; ctx.fillRect(-40, 2, 80, 3);
+    ctx.fillStyle = PAL.deep;  ctx.fillRect(-40, 8, 80, 2);
+    // tailplanes
+    outlined(-26, -8, 12, 6, PAL.plum); outlined(14, -8, 12, 6, PAL.plum);
+    // twin fins
+    outlined(-16, -20, 5, 14, PAL.deep); outlined(11, -20, 5, 14, PAL.deep);
+    ctx.fillStyle = PAL.amber; ctx.fillRect(-16, -20, 5, 3); ctx.fillRect(11, -20, 5, 3);
+    // fuselage + nacelles
+    outlined(-17, -2, 34, 20, PAL.plum);
+    ctx.fillStyle = PAL.deep; ctx.fillRect(-17, 12, 34, 6);          // shadow tone
+    ctx.fillStyle = PAL.peach; ctx.fillRect(-15, 0, 30, 2);          // highlight tone
+    outlined(-15, 14, 9, 6, PAL.deep); outlined(6, 14, 9, 6, PAL.deep);
+    // canopy with the Bot
+    outlined(-11, -14, 22, 14, PAL.dark);
+    if(heroOk) ctx.drawImage(hero, -10, -13, 20, 12);
+    ctx.fillStyle = 'rgba(159,240,221,.28)'; ctx.fillRect(-11, -14, 22, 5);
+    ctx.restore();
+  }
+
+  // Bogeys — bot-drones, every one ours.
+  function drawBogey(b, x, y, sz){
+    const t = b.t; ctx.save(); ctx.translate(x, y); ctx.scale(sz / 44, sz / 44);
+    if(t === 'drifter'){                                    // harmless striped single-burner
+      outlined(-18, -3, 36, 7, PAL.soft); ctx.fillStyle = PAL.elec; ctx.fillRect(-18, -3, 36, 2);
+      outlined(-6, -9, 12, 14, PAL.soft);
+      ctx.fillStyle = PAL.steel; ctx.fillRect(-6, 1, 12, 4);
+      ctx.fillStyle = PAL.dark;  ctx.fillRect(-4, -7, 8, 4);
+      ctx.fillStyle = PAL.amber; ctx.fillRect(-3, 5, 6, 5);
+    } else if(t === 'hauler'){                              // heavy, big under-hull, drops bombs
+      outlined(-24, -2, 48, 8, PAL.rust); ctx.fillStyle = PAL.amber; ctx.fillRect(-24, -2, 48, 2);
+      outlined(-11, -10, 22, 14, PAL.plum);
+      ctx.fillStyle = PAL.deep; ctx.fillRect(-11, 0, 22, 4);
+      outlined(-9, 4, 18, 8, PAL.deep);                     // the slung belly
+      ctx.fillStyle = PAL.red;  ctx.fillRect(-7, 6, 14, 3);
+      ctx.fillStyle = PAL.dark; ctx.fillRect(-7, -8, 14, 5);
+      ctx.fillStyle = PAL.elec; ctx.fillRect(-13, 8, 5, 4); ctx.fillRect(8, 8, 5, 4);
+    } else if(t === 'sliver'){                              // thin dart, weaves
+      outlined(-20, -1, 40, 4, PAL.teal);
+      outlined(-4, -12, 8, 20, PAL.mint);
+      ctx.fillStyle = PAL.teal; ctx.fillRect(-4, 2, 8, 6);
+      ctx.fillStyle = PAL.dark; ctx.fillRect(-3, -10, 6, 4);
+      ctx.fillStyle = PAL.elec; ctx.fillRect(-2, 8, 4, 5);
+    } else {                                                // rotor — chopper on the screen edge
+      outlined(-9, -4, 18, 12, PAL.steel);
+      ctx.fillStyle = PAL.deep; ctx.fillRect(-9, 4, 18, 4);
+      ctx.fillStyle = PAL.dark; ctx.fillRect(-6, -2, 9, 5);
+      outlined(7, -1, 12, 3, PAL.steel);                    // tail boom
+      ctx.strokeStyle = PAL.deep; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.ellipse(0, -8, 22, 3.2, 0, 0, Math.PI * 2); ctx.stroke();
+      ctx.strokeStyle = 'rgba(253,243,231,.55)'; ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.ellipse(0, -8, 22, 3.2, 0, 0, Math.PI * 2); ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  // The $OIL tanker drone — four burners, very long, boom out.
+  function drawTanker(x, y, sz, docking){
+    ctx.save(); ctx.translate(x, y); ctx.scale(sz / 120, sz / 120);
+    outlined(-56, -6, 112, 16, PAL.soft);
+    ctx.fillStyle = PAL.amber; ctx.fillRect(-56, -6, 112, 3);
+    ctx.fillStyle = PAL.steel; ctx.fillRect(-56, 6, 112, 4);
+    outlined(-70, 0, 140, 5, PAL.plum);                     // the long wing
+    for(const dx of [-40, -18, 18, 40]){ outlined(dx - 5, 4, 10, 7, PAL.deep);
+      ctx.fillStyle = PAL.elec; ctx.fillRect(dx - 3, 9, 6, 5); }
+    ctx.fillStyle = PAL.dark; ctx.fillRect(-52, -4, 14, 6);
+    // refuelling boom, extended toward you
+    ctx.strokeStyle = PAL.deep; ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.moveTo(0, 10); ctx.lineTo(0, docking ? 62 : 34); ctx.stroke();
+    ctx.fillStyle = PAL.amber; ctx.fillRect(-4, (docking ? 58 : 30), 8, 6);
+    ctx.font = 'bold 11px system-ui'; ctx.fillStyle = PAL.deep; ctx.textAlign = 'center';
+    ctx.fillText('OIL', 0, 2); ctx.textAlign = 'left';
+    ctx.restore();
+  }
+
+  function drawEnemyMissile(x, y, sz){
+    ctx.save(); ctx.translate(x, y);
+    const w = Math.max(2, sz * 0.24), h = Math.max(3, sz * 0.5);
+    ctx.fillStyle = 'rgba(253,243,231,.30)'; ctx.fillRect(-w * 1.6, -h * 3.4, w * 3.2, h * 3.4);
+    outlined(-w / 2, -h / 2, w, h, PAL.soft);
+    ctx.fillStyle = PAL.red;   ctx.fillRect(-w / 2, -h / 2, w, Math.max(1, h * 0.3));
+    ctx.fillStyle = PAL.amber; ctx.fillRect(-w / 2, h / 2 - 1, w, 2);
+    ctx.restore();
+  }
+
+  function drawStructure(o, p, sz){
+    const k = p.k;
+    if(o.kind === 'pillar'){
+      const w = o.w * k * 2, h = o.h * k * 2.4;
+      ctx.fillStyle = PAL.deep;  ctx.fillRect(p.x - w / 2 - 1, p.y - h, w + 2, h + 2);
+      ctx.fillStyle = '#6b5a4a'; ctx.fillRect(p.x - w / 2, p.y - h, w, h);
+      ctx.fillStyle = '#8a7460'; ctx.fillRect(p.x - w / 2, p.y - h, w * 0.4, h);
+      ctx.fillStyle = '#4a3c33'; ctx.fillRect(p.x + w * 0.2, p.y - h, w * 0.3, h);
+    } else if(o.kind === 'antenna'){
+      const w = Math.max(2, o.w * k), h = o.h * k * 2.2;
+      ctx.fillStyle = PAL.deep;  ctx.fillRect(p.x - w / 2 - 1, p.y - h / 2 - 1, w + 2, h + 2);
+      ctx.fillStyle = PAL.steel; ctx.fillRect(p.x - w / 2, p.y - h / 2, w, h);
+      ctx.fillStyle = PAL.amber; ctx.fillRect(p.x - w * 1.6, p.y - h / 2 - w, w * 3.2, Math.max(2, w));
+      ctx.fillStyle = PAL.red;   ctx.fillRect(p.x - w / 2, p.y - h / 2 - w * 2, w, Math.max(2, w));
+    } else {
+      const w = o.w * k * 2, h = o.h * k * 2;
+      ctx.fillStyle = PAL.deep;  ctx.fillRect(p.x - w / 2 - 1, p.y - h - 1, w + 2, h + 2);
+      ctx.fillStyle = PAL.plum;  ctx.fillRect(p.x - w / 2, p.y - h, w, h);
+      ctx.fillStyle = PAL.peach; ctx.fillRect(p.x - w / 2, p.y - h, w, Math.max(1, h * 0.25));
+      ctx.fillStyle = PAL.teal;  ctx.fillRect(p.x - w * 0.3, p.y - h * 0.6, w * 0.6, h * 0.35);
+    }
+  }
+
+  function drawBoom(f){
+    const p = project(s, f.x, f.y, f.z), t = f.t / f.life;
+    const r = Math.max(2, f.r * (0.3 + t * 1.5) * 0.5 * p.k);
+    ctx.globalAlpha = 1 - t;
+    ctx.fillStyle = PAL.amber; ctx.beginPath(); ctx.arc(p.x, p.y, r, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = PAL.soft;  ctx.beginPath(); ctx.arc(p.x, p.y, r * 0.5, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = PAL.red; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(p.x, p.y, r * 1.35, 0, Math.PI * 2); ctx.stroke();
+    ctx.globalAlpha = 1;
+  }
+
+  /* ======================= WORLD BACKDROP ================================= */
+  function drawSky(){
+    const st = STAGES[s.stage - 1].sky;
+    const g = ctx.createLinearGradient(0, -H, 0, HORIZON + 40);
+    g.addColorStop(0, st.sky[0]); g.addColorStop(1, st.sky[1]);
+    ctx.fillStyle = g; ctx.fillRect(-W, -H, W * 3, HORIZON + H + 40);
+    // one cheap texture layer: drifting speckle / nebula, branded not busy
+    ctx.globalAlpha = 0.16; ctx.fillStyle = PAL.soft;
+    for(let i = 0; i < 26; i++){
+      const a = (i * 97.3 + s.dist * 0.012) % (W * 2) - W / 2;
+      const b = -40 + ((i * 53.7) % (HORIZON + 30));
+      ctx.fillRect(a, b, 2, 2);
+    }
+    ctx.globalAlpha = 1;
+    // sun disc low on the horizon
+    ctx.globalAlpha = 0.5; ctx.fillStyle = PAL.soft;
+    ctx.beginPath(); ctx.arc(W * 0.72, HORIZON - 38, 20, 0, Math.PI * 2); ctx.fill();
+    ctx.globalAlpha = 1;
+    // parallax cloud bands
+    ctx.globalAlpha = 0.28; ctx.fillStyle = PAL.soft;
+    for(let i = 0; i < 7; i++){
+      const z = 700 + i * 520 - (s.dist % 520);
+      const k = FOCAL / Math.max(z, 80);
+      const cx = W / 2 + ((i * 421 % 900) - 450 - s.px * CAM_LAT) * k;
+      const cy = HORIZON - (90 - s.py * CAM_VRT) * k;
+      ctx.beginPath(); ctx.ellipse(cx, cy, 90 * k, 16 * k, 0, 0, Math.PI * 2); ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  function drawGround(){
+    const st = STAGES[s.stage - 1].sky;
+    const g = ctx.createLinearGradient(0, HORIZON, 0, H + 60);
+    g.addColorStop(0, st.grd[0]); g.addColorStop(1, st.grd[1]);
+    ctx.fillStyle = g; ctx.fillRect(-W, HORIZON, W * 3, H + 120);
+    ctx.fillStyle = 'rgba(253,243,231,.35)'; ctx.fillRect(-W, HORIZON - 1, W * 3, 1);
+    // receding bands so speed reads even over empty ocean
+    const GY = -150, period = 340;
+    for(let i = 1; i < 24; i++){
+      const z = i * period - (s.dist % period);
+      if(z < 40) continue;
+      const k = FOCAL / z, y = HORIZON - (GY - s.py * CAM_VRT) * k;
+      if(y < HORIZON || y > H + 40) continue;
+      ctx.globalAlpha = Math.min(0.5, k * 0.8);
+      ctx.fillStyle = st.kind === 'sea' ? PAL.soft : (st.kind === 'cloud' ? PAL.soft : PAL.amber);
+      ctx.fillRect(-W, y, W * 3, Math.max(1, k * 3));
+      ctx.globalAlpha = 1;
+    }
+    // a couple of faint rails hint at the pan without turning the sea into a road
+    ctx.globalAlpha = 0.10; ctx.strokeStyle = PAL.soft; ctx.lineWidth = 1;
+    for(let lx = -600; lx <= 600; lx += 400){
+      ctx.beginPath();
+      const a = project(s, lx, GY, 120), b = project(s, lx, GY, 3000);
+      ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  function drawCanyonWalls(){
+    // granite either side of the corridor — stray into it and you wear it
+    for(const side of [-1, 1]){
+      ctx.beginPath();
+      const near = project(s, side * 132, -150, 90), nearT = project(s, side * 132, 120, 90);
+      const far  = project(s, side * 132, -150, 2600), farT = project(s, side * 132, 120, 2600);
+      ctx.moveTo(near.x, near.y); ctx.lineTo(far.x, far.y);
+      ctx.lineTo(farT.x, farT.y); ctx.lineTo(nearT.x, nearT.y); ctx.closePath();
+      const g = ctx.createLinearGradient(0, HORIZON - 60, 0, H);
+      g.addColorStop(0, '#5a4636'); g.addColorStop(1, '#2e231b');
+      ctx.fillStyle = g; ctx.fill();
+      ctx.strokeStyle = PAL.deep; ctx.lineWidth = 2; ctx.stroke();
+    }
+  }
+
+  /* ======================= HUD (in-canvas, arcade style) ================== */
+  function pad(n, w){ return String(n).padStart(w, '0'); }
+  function drawHUD(){
+    ctx.font = '12px "Jersey 15", system-ui'; ctx.textAlign = 'left';
+    ctx.fillStyle = 'rgba(34,26,38,.42)'; ctx.fillRect(0, 0, W, 20);
+    ctx.fillStyle = PAL.soft; ctx.fillText('SCORE', 6, 14);
+    ctx.fillStyle = PAL.amber; ctx.fillText(pad(Math.floor(s.score), 9), 46, 14);
+    ctx.fillStyle = PAL.soft;
+    const kind = s.stageKind === 'canyon' ? 'CANYON' : s.stageKind === 'refuel' ? 'REFUEL'
+               : s.stageKind === 'land' ? 'LANDING' : 'STAGE';
+    ctx.fillText(kind + ' ' + s.stage + '/23', 124, 14);
+    ctx.fillText('MSL', 196, 14);
+    ctx.fillStyle = s.missiles > 10 ? PAL.mint : PAL.red;
+    ctx.fillText(String(s.missiles), 222, 14);
+    // lives as little tail fins
+    ctx.fillStyle = PAL.soft; ctx.fillText('PLANES', 250, 14);
+    for(let i = 0; i < Math.min(s.lives, 8); i++){
+      ctx.fillStyle = PAL.amber; ctx.fillRect(292 + i * 8, 6, 5, 8);
+      ctx.fillStyle = PAL.deep;  ctx.fillRect(292 + i * 8, 12, 5, 2);
+    }
+    drawRadar(W - 104, 24);
+    drawSpeed(8, H - 56);
+    // stage-progress ribbon
+    ctx.fillStyle = 'rgba(253,243,231,.22)'; ctx.fillRect(0, 20, W, 2);
+    ctx.fillStyle = PAL.amber; ctx.fillRect(0, 20, W * Math.min(1, s.stageDist / s.stageLen), 2);
+  }
+
+  // The cabinet's radar: white frame = your screen, red blips = bogeys,
+  // blips outside the frame are coming at you from the side.
+  function drawRadar(x, y){
+    const w = 96, h = 40;
+    ctx.fillStyle = 'rgba(34,26,38,.5)'; ctx.fillRect(x, y, w, h);
+    ctx.strokeStyle = 'rgba(253,243,231,.45)'; ctx.lineWidth = 1; ctx.strokeRect(x + .5, y + .5, w - 1, h - 1);
+    ctx.strokeStyle = PAL.soft; ctx.strokeRect(x + w * 0.29 + .5, y + .5, w * 0.42, h - 1);  // the screen's field
+    for(const b of s.bog){
+      if(b.z < 0 || b.z > 2600) continue;
+      const bx = x + w / 2 + ((b.x - s.px * CAM_LAT) / 620) * w;
+      const by = y + h - (b.z / 2600) * h;
+      if(bx < x || bx > x + w) continue;
+      ctx.fillStyle = PAL.red; ctx.fillRect(bx - 1.5, by - 1.5, 3, 3);
+    }
+    if(s.tail.kind){ ctx.fillStyle = s.tail.kind === 'spike' ? PAL.red : PAL.amber;
+      ctx.fillRect(x + w / 2 - 3, y + h - 4, 6, 3); }
+    // wing attitude
+    ctx.save(); ctx.beginPath(); ctx.rect(x, y, w, h); ctx.clip();
+    ctx.translate(x + w / 2, y + h / 2); ctx.rotate(-s.roll);
+    ctx.strokeStyle = PAL.mint; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(-w / 2, 0); ctx.lineTo(w / 2, 0); ctx.stroke();
+    ctx.restore();
+  }
+
+  function drawSpeed(x, y){
+    const w = 10, h = 34;
+    ctx.fillStyle = 'rgba(34,26,38,.5)'; ctx.fillRect(x, y, w, h);
+    const t = (s.spd - THR.slow) / (THR.burner - THR.slow);
+    const fh = Math.max(2, h * Math.max(0, Math.min(1, t)));
+    ctx.fillStyle = s.burner ? PAL.amber : PAL.mint; ctx.fillRect(x + 2, y + h - fh, w - 4, fh);
+    ctx.strokeStyle = 'rgba(253,243,231,.45)'; ctx.strokeRect(x + .5, y + .5, w - 1, h - 1);
+    ctx.font = '9px "Jersey 15", system-ui'; ctx.fillStyle = PAL.soft; ctx.textAlign = 'center';
+    ctx.fillText(s.burner ? 'BURN' : 'SPD', x + w / 2, y + h + 9); ctx.textAlign = 'left';
+  }
+
+  function drawSight(){
+    if(s.stageKind === 'refuel' || s.stageKind === 'land') return;
+    const rx = retX(s), ry = retY(s);
+    ctx.strokeStyle = s.locks.length ? PAL.amber : 'rgba(253,243,231,.75)';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(rx - 14, ry); ctx.lineTo(rx - 4, ry); ctx.moveTo(rx + 4, ry); ctx.lineTo(rx + 14, ry);
+    ctx.moveTo(rx, ry - 14); ctx.lineTo(rx, ry - 4); ctx.moveTo(rx, ry + 4); ctx.lineTo(rx, ry + 14);
+    ctx.stroke();
+    // lock area as corner brackets — reads as a gunsight, not a picture frame
+    const bw = LOCK_BOX_X, bh = LOCK_BOX_Y, c = 11;
+    ctx.globalAlpha = s.locks.length ? 0.95 : 0.4; ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    for(const sx of [-1, 1]) for(const sy of [-1, 1]){
+      ctx.moveTo(rx + sx * bw - sx * c, ry + sy * bh); ctx.lineTo(rx + sx * bw, ry + sy * bh);
+      ctx.moveTo(rx + sx * bw, ry + sy * bh); ctx.lineTo(rx + sx * bw, ry + sy * bh - sy * c);
+    }
+    ctx.stroke(); ctx.globalAlpha = 1;
+    // lock boxes + the FIRE call
+    for(const i of s.locks){
+      const b = s.bog[i]; if(!b) continue;
+      const p = project(s, b.x, b.y, b.z), r = Math.max(7, 26 * p.k);
+      ctx.strokeStyle = PAL.amber; ctx.lineWidth = 2;
+      ctx.strokeRect(p.x - r, p.y - r * 0.8, r * 2, r * 1.6);
+    }
+    if(s.locks.length && Math.floor(s.timeMs / 180) % 2){
+      ctx.font = '14px "Jersey 15", system-ui'; ctx.fillStyle = PAL.amber; ctx.textAlign = 'center';
+      ctx.fillText('FIRE!', W / 2, 40); ctx.textAlign = 'left';
+    }
+  }
+
+  function drawMsg(){
+    if(s.msgT <= 0 || !s.msg) return;
+    ctx.font = '20px "Jersey 15", system-ui'; ctx.textAlign = 'center';
+    ctx.fillStyle = 'rgba(34,26,38,.55)'; ctx.fillRect(W / 2 - 110, 52, 220, 24);
+    ctx.fillStyle = PAL.soft; ctx.fillText(s.msg, W / 2, 70); ctx.textAlign = 'left';
+  }
+
+  /* ======================= FRAME ========================================== */
+  function draw(){
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.clearRect(0, 0, W, H);
+    ctx.save();
+    if(s.shake > 0){ const m = s.shake / 700 * 4; ctx.translate((Math.random() - .5) * m, (Math.random() - .5) * m); }
+
+    // the world rolls the opposite way to the airframe
+    ctx.save();
+    ctx.translate(W / 2, HORIZON); ctx.rotate(-s.roll); ctx.translate(-W / 2, -HORIZON);
+    drawSky(); drawGround();
+    if(s.stageKind === 'canyon') drawCanyonWalls();
+
+    // everything in the world, far to near
+    const items = [];
+    for(const o of s.obst) if(o.alive && o.z > NEAR) items.push({ z:o.z, kind:'o', ref:o });
+    for(const b of s.bog)  if(b.alive && b.z > NEAR) items.push({ z:b.z, kind:'b', ref:b });
+    for(const m of s.msl)  if(m.z > NEAR)            items.push({ z:m.z, kind:'m', ref:m });
+    items.sort((a, b) => b.z - a.z);
+    for(const it of items){
+      const r = it.ref, p = project(s, r.x, r.y, r.z);
+      if(p.x < -200 || p.x > W + 200) continue;
+      if(it.kind === 'o') drawStructure(r, p, 1);
+      else if(it.kind === 'b'){
+        const base = r.t === 'hauler' ? 74 : r.t === 'sliver' ? 44 : r.t === 'rotor' ? 50 : 48;
+        drawBogey(r, p.x, p.y, Math.max(4, base * p.k));
+      } else drawEnemyMissile(p.x, p.y, Math.max(3, 34 * p.k));
+    }
+    if(s.stageKind === 'refuel'){
+      const z = Math.max(340, 1700 - s.dock * 0.62), p = project(s, 0, 46, z);
+      drawTanker(p.x, p.y, Math.min(300, Math.max(40, 240 * p.k)), s.dock > 2400);
+    }
+    for(const f of s.fx) drawBoom(f);
+    ctx.restore();
+
+    // your own missiles streaking away from the rails
+    for(const m of s.myMsl){
+      const t = m.t / MSL_FLIGHT, z = 120 + t * 1400, p = project(s, (m.tgt && m.tgt.x ? m.tgt.x : 0) * t, 0, z);
+      const sx = plX(s) + (p.x - plX(s)) * t, sy = plY(s) + (p.y - plY(s)) * t;
+      ctx.fillStyle = 'rgba(253,243,231,.35)'; ctx.fillRect(sx - 1, sy, 2, 16 * (1 - t) + 4);
+      ctx.fillStyle = PAL.amber; ctx.fillRect(sx - 2, sy - 3, 4, 6);
+    }
+
+    // the rear threat lives in a strip at the bottom — you feel it before you see it
+    if(s.tail.kind){
+      const warn = s.tail.kind === 'spike' ? 'BE CAREFUL!' : 'THE ENEMY!';
+      if(Math.floor(s.timeMs / 220) % 2){
+        ctx.fillStyle = s.tail.kind === 'spike' ? 'rgba(192,57,43,.55)' : 'rgba(242,160,61,.5)';
+        ctx.fillRect(0, H - 18, W, 18);
+        ctx.font = '14px "Jersey 15", system-ui'; ctx.textAlign = 'center'; ctx.fillStyle = PAL.soft;
+        ctx.fillText(warn + '  —  ' + (s.tail.kind === 'spike' ? 'BURN, SLOW OR ROLL' : 'SLOW AND GUN HIM'), W / 2, H - 5);
+        ctx.textAlign = 'left';
+      }
+    }
+
+    // the EMBER (and you, Bot 106)
+    if(s.phase === 'play' && !(s.invuln > 0 && Math.floor(s.timeMs / 100) % 2))
+      drawEmber(plX(s), plY(s), 64, s.roll, s.burner, s.invuln > 0);
+
+    drawSight(); drawHUD(); drawMsg();
+    if(s.flash > 0){ ctx.fillStyle = 'rgba(242,160,61,' + (s.flash / 420 * 0.5) + ')'; ctx.fillRect(0, 0, W, H); }
+    ctx.restore();
+
+    if(!active || rulesO.classList.contains('show')){
+      ctx.fillStyle = 'rgba(34,26,38,.35)'; ctx.fillRect(0, 0, W, H);
+    }
+  }
+
+  /* ======================= OVERLAYS + HUD SYNC ============================ */
+  const rulesO = document.getElementById('rulesOverlay'), overO = document.getElementById('overOverlay'),
+        paidO = document.getElementById('paidOverlay'), infoBtn = document.getElementById('infoBtn');
+  function openRules(){ rulesO.classList.add('show'); document.getElementById('rulesClose').focus(); }
+  function closeRules(){ rulesO.classList.remove('show'); infoBtn.focus(); }
+  infoBtn.onclick = openRules; document.getElementById('rulesClose').onclick = closeRules;
+  rulesO.addEventListener('click', e => { if(e.target === rulesO) closeRules(); });
+  function restart(){ s = newRun(); active = true; prevPhase = 'play';
+    overO.classList.remove('show'); paidO.classList.remove('show'); }
+  document.getElementById('restartBtn').onclick = restart;
+  function mmss(ms){ const t = Math.floor(ms / 1000); return Math.floor(t / 60) + ':' + pad(t % 60, 2); }
+  function showOver(){
+    document.getElementById('overTitle').textContent = s.phase === 'won' ? 'MISSION COMPLETE' : 'SHOT DOWN';
+    document.getElementById('overCard').className = s.phase === 'won' ? 'card win' : 'card';
+    document.getElementById('oScore').textContent = String(Math.floor(s.score));
+    document.getElementById('oStage').textContent = s.stage + '/23';
+    document.getElementById('oHits').textContent = String(s.hits);
+    document.getElementById('oTime').textContent = mmss(s.timeMs);
+    overO.classList.add('show'); document.getElementById('retryBtn').focus();
+  }
+  document.getElementById('retryBtn').onclick = restart;
+
+  const elScore = document.getElementById('score'), elLives = document.getElementById('lives');
+  let livesShown = -1;
+  function syncHUD(){
+    elScore.textContent = pad(Math.floor(s.score), 9);
+    if(s.lives !== livesShown){ livesShown = s.lives; elLives.innerHTML = '';
+      for(let i = 0; i < Math.min(s.lives, 8); i++){ const d = document.createElement('span'); d.className = 'life'; elLives.appendChild(d); } }
+  }
+
+  const muteBtn = document.getElementById('muteBtn');
+  if(muteBtn) muteBtn.onclick = () => { muted = !muted; muteBtn.textContent = muted ? '🔇' : '🔊'; };
+
+  /* ======================= INPUT ========================================== */
+  // The cabinet is a stick (left hand) and a throttle + triggers (right hand).
+  // Touch: drag the canvas OR the stick pad to fly; FIRE / BURN / SLOW on the right.
+  let stickX = 0, stickY = 0, stickOn = false;
+  const keys = { l:false, r:false, u:false, d:false };
+  let btnFire = false, btnBurn = false, btnSlow = false, keyFire = false, keyBurn = false, keySlow = false;
+  // the arcade's afterburner: tap the throttle, then tap AND HOLD it again
+  let burnPressT = -1e9, burnDouble = false;
+  function burnPress(){ const now = performance.now();
+    burnDouble = (now - burnPressT) < 340; burnPressT = now; }
+  function burnRelease(){ burnDouble = false; }
+
+  function stickFrom(el, e){
+    const r = el.getBoundingClientRect();
+    const nx = ((e.clientX - r.left) / r.width  - 0.5) / 0.40;
+    const ny = ((e.clientY - r.top)  / r.height - 0.5) / 0.40;
+    stickX = Math.max(-1, Math.min(1, nx));
+    stickY = Math.max(-1, Math.min(1, -ny));      // screen-down is nose-down
+  }
+  function bindStick(el){
+    if(!el) return;
+    el.addEventListener('pointerdown', e => { e.preventDefault(); stickOn = true;
+      try{ el.setPointerCapture(e.pointerId); }catch(_){} stickFrom(el, e); });
+    el.addEventListener('pointermove', e => { if(stickOn){ e.preventDefault(); stickFrom(el, e); } });
+    const up = e => { stickOn = false; stickX = 0; stickY = 0; };
+    el.addEventListener('pointerup', up); el.addEventListener('pointercancel', up); el.addEventListener('pointerleave', up);
+  }
+  bindStick(cv); bindStick(document.getElementById('stickPad'));
+
+  function bindHold(id, set){
+    const el = document.getElementById(id); if(!el) return;
+    const on = e => { e.preventDefault(); el.classList.add('on'); set(true); };
+    const off = e => { e.preventDefault(); el.classList.remove('on'); set(false); };
+    el.addEventListener('pointerdown', on); el.addEventListener('pointerup', off);
+    el.addEventListener('pointerleave', off); el.addEventListener('pointercancel', off);
+  }
+  bindHold('btnFire', v => btnFire = v);
+  bindHold('btnBurn', v => { btnBurn = v; if(v) burnPress(); else burnRelease(); });
+  bindHold('btnSlow', v => btnSlow = v);
+
+  const KMAP = { ArrowLeft:'l', ArrowRight:'r', ArrowUp:'u', ArrowDown:'d',
+                 Left:'l', Right:'r', Up:'u', Down:'d',
+                 a:'l', d:'r', w:'u', s:'d', A:'l', D:'r', W:'u', S:'d' };
+  addEventListener('keydown', e => {
+    if(e.key === 'Escape'){ closeRules(); return; }
+    if(e.key === 'r' || e.key === 'R'){ restart(); return; }
+    if(e.key === 'm' || e.key === 'M'){ if(muteBtn) muteBtn.click(); return; }
+    if(!active) return;
+    if(e.key === ' '){ keyFire = true; e.preventDefault(); return; }
+    if(e.key === 'Shift' || e.key === 'z' || e.key === 'Z'){ if(!keyBurn) burnPress(); keyBurn = true; e.preventDefault(); return; }
+    if(e.key === 'x' || e.key === 'X' || e.key === 'Control'){ keySlow = true; e.preventDefault(); return; }
+    const k = KMAP[e.key]; if(k){ keys[k] = true; e.preventDefault(); }
+  });
+  addEventListener('keyup', e => {
+    if(e.key === ' '){ keyFire = false; return; }
+    if(e.key === 'Shift' || e.key === 'z' || e.key === 'Z'){ keyBurn = false; burnRelease(); return; }
+    if(e.key === 'x' || e.key === 'X' || e.key === 'Control'){ keySlow = false; return; }
+    const k = KMAP[e.key]; if(k) keys[k] = false;
+  });
+
+  function apply(){
+    if(!active){ s.inX = 0; s.inY = 0; s.inFire = false; s.inBurn = false; s.inSlow = false; return; }
+    let kx = (keys.r ? 1 : 0) - (keys.l ? 1 : 0), ky = (keys.u ? 1 : 0) - (keys.d ? 1 : 0);
+    s.inX = kx !== 0 ? kx : stickX;
+    s.inY = ky !== 0 ? ky : stickY;
+    s.inFire = btnFire || keyFire;
+    s.inBurn = btnBurn || keyBurn;
+    s.inBurnerReq = burnDouble;
+    s.inSlow = btnSlow || keySlow;
+  }
+
+  /* ======================= ENGINE CONTRACT =============================== */
+  function startRun(){ s = newRun(); active = true; prevPhase = 'play';
+    rulesO.classList.remove('show'); overO.classList.remove('show'); paidO.classList.remove('show'); }
+  function idleForPaid(){ s = newRun(); active = false; }
+  function resumeFree(){ s = newRun(); active = true; prevPhase = 'play'; overO.classList.remove('show'); }
+  window.BOTBURNEREngine = { start:startRun, idle:idleForPaid, resumeFree:resumeFree, state:() => s };
+  function endRun(){
+    active = false; syncHUD();
+    const res = { score:Math.floor(s.score), stage:s.stage, hits:s.hits, timeMs:s.timeMs };
+    if(window.BOTBURNERPaid && BOTBURNERPaid.onRunEnd && BOTBURNERPaid.onRunEnd(res)) return;
+    showOver();
+  }
+
+  /* ======================= LOOP ========================================== */
+  let last = performance.now(), acc = 0; const TICK = 1000 / 60;
+  function frame(now){
+    let dt = now - last; last = now; if(dt > 200) dt = 200;
+    if(active && s.phase === 'play' && !rulesO.classList.contains('show')){
+      acc += dt; let guard = 0;
+      while(acc >= TICK && s.phase === 'play' && guard < 6){
+        acc -= TICK; apply();
+        const ev = stepGame(s, TICK);
+        if(ev.gun)    noise(0.03, 0.035);
+        if(ev.fire)   tone(880, 0.12, 'sawtooth', 0.05);
+        if(ev.kill)   noise(0.22, 0.09);
+        if(ev.hit)    { noise(0.5, 0.14); tone(120, 0.5, 'sawtooth', 0.06); }
+        if(ev.extra)  { tone(660, 0.1); setTimeout(() => tone(990, 0.16), 110); }
+        if(ev.refuel) tone(520, 0.18, 'triangle', 0.05);
+        if(ev.stage)  tone(740, 0.14, 'triangle', 0.05);
+        guard++;
+      }
+    } else acc = 0;
+    if(s.phase !== 'play' && prevPhase === 'play' && (s.phase === 'dead' || s.phase === 'won')) endRun();
+    prevPhase = s.phase; syncHUD(); draw(); requestAnimationFrame(frame);
+  }
+  requestAnimationFrame(frame);
+
+  try{ var _p = new URLSearchParams(location.search);
+       if(!_p.get('phantom_action') && _p.get('src') !== 'browse') openRules(); }catch(e){}
+})();
+}
+
+</script>
+
+<!-- Shared wallet libs (loaded once; the wallet LOGIC stays dead until Paid is chosen — mirrors live Mr Bot / Rush). -->
+<script src="phantom-deeplink-libs.min.js?v=20260906a"></script>
+<script src="phantom-mobile.js?v=20260906a"></script>
+<script src="solana-web3.iife.min.js?v=20260906a"></script>
+<script>
+  // NOTE: the score-memo SHAPE (buildScoreMemo + the result fields it carries: res.height/res.oil/...) is
+  // per-game — change those to your run stats. Everything else in this layer stays byte-identical.
+/* ============================================================================
+ * Bot Smash — Paid layer. BURN sink + fun leaderboard.
+ * The wallet MECHANICS below (getProvider, fetchOilBalance, buildTransferIx,
+ * buildMemoIx, confirmSignature, sendPayment, onConnect, resume) are LIFTED
+ * VERBATIM from the live Mr Bot index.html (itself lifted from Bot Merge Rush)
+ * — only CFG values, the BURN memo tag / pending key / sign marker, and the
+ * score-memo shape change. The UI glue is Bot Smash's (single-run action game).
+ * Bot Smash is real-time and UNREPLAYABLE. The leaderboard is a FUN RANKING +
+ * an OIL SINK. It is NOT verified / provably fair. Records, does not verify.
+ * ==========================================================================*/
+(function(){
+  'use strict';
+  var mode = 'free';
+  function $(id){ return document.getElementById(id); }
+
+  function lockModeToggle(lock){
+    $('modeFree').disabled = !!lock;
+    $('modePaid').disabled = !!lock;
+  }
+
+  var Paid = (function(){
+    var TEST_MODE = true;     // <-- ships TEST for Localnet proof; flip to false ONLY with Founder confirm in this run's output
+    var CFG = TEST_MODE ? {
+      RPC: 'http://127.0.0.1:8899',
+      TOKEN_PROGRAM: 'TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA',
+      MEMO_PROGRAM: 'MemoSq4gqABAXKb96qnH8TysNcWxMyWCqXgDLGmfcHr',
+      OIL_MINT: '9B5ZQifZQc3ykhnZhA9m8DFoNY5uaTwqHGNZMah6eK8Y',
+      TREASURY: '8tzZzNiGkE2kYXhUSauNEUyVHiaWBt5pBagg7CHKPNBM',
+      TREASURY_TOKEN_ACCOUNT: '3s1SQ7JZmti4PfhVsb7LCTn9q5ZhRBMaH6v2vsrVZeg6',
+      ENTRY_FEE: 25, POST_FEE: 1, DECIMALS: 2
+    } : {
+      RPC: 'https://finnbots-rpc.mart-kin1000.workers.dev',
+      TOKEN_PROGRAM: 'TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA',
+      MEMO_PROGRAM: 'MemoSq4gqABAXKb96qnH8TysNcWxMyWCqXgDLGmfcHr',
+      OIL_MINT: 'HrcfXJcFdMoLfbkN5qCTSFrLsAgJNHitmwKc5AyS7xzf',
+      TREASURY: '75WPN3kwYUT5kdPU7V3Fp3LhnxmPC38bsgBCasRQdXMR',
+      TREASURY_TOKEN_ACCOUNT: '2ZBNMLZFfHCuZm9Lfc3b7ut296tRwGtapuXad7zSm1ED',
+      ENTRY_FEE: 25, POST_FEE: 1, DECIMALS: 2
+    };
+    var MEMO_TAG = 'BURN';
+    var wallet = { pubkey:null, oil:0 };
+    var inited=false, busy=false, entrySig=null, pendingResult=null;
+    var connectBtn, walletStatus;
+
+    function $(id){ return document.getElementById(id); }
+    // ---- verbatim from Rush/Mr Bot ----
+    function getProvider(){ if(window.phantom&&window.phantom.solana&&window.phantom.solana.isPhantom) return window.phantom.solana; if(window.solana&&window.solana.isPhantom) return window.solana; return null; }
+    function shortAddr(a){ return a.slice(0,4)+'\u2026'+a.slice(-4); }
+    function setStatus(html,cls){ walletStatus.classList.remove('hidden'); walletStatus.className='wallet-status'+(cls?' '+cls:''); walletStatus.innerHTML=html; }
+    function canPlay(){ return !!wallet.pubkey && wallet.oil>=CFG.ENTRY_FEE; }
+    function delay(ms){ return new Promise(function(res){ setTimeout(res,ms); }); }
+
+    // ---- balance (verbatim from Rush/Mr Bot) -------------------------------
+    async function fetchOilBalance(owner){
+      try{ var body=JSON.stringify({ jsonrpc:'2.0', id:'oilbal', method:'getTokenAccountsByOwner', params:[ owner, { mint:CFG.OIL_MINT }, { encoding:'jsonParsed' } ] });
+        var r=await fetch(CFG.RPC,{ method:'POST', headers:{'Content-Type':'application/json'}, body:body }); if(!r.ok) return 0;
+        var j=await r.json(); var accts=j&&j.result&&j.result.value; if(!accts||!accts.length) return 0;
+        var base=0; accts.forEach(function(acc){ try{ base+=Number(acc.account.data.parsed.info.tokenAmount.amount); }catch(e){} });
+        return base/Math.pow(10,CFG.DECIMALS);
+      }catch(e){ return 0; }
+    }
+    async function checkBalance(owner){
+      wallet.oil=await fetchOilBalance(owner);
+      var pfx=TEST_MODE?'\ud83e\uddea TEST MODE \u2014 ':'';
+      if(wallet.oil>=CFG.ENTRY_FEE){ setStatus('Connected as <span class="addr">'+shortAddr(owner)+'</span><br/>'+pfx+'You hold <b>'+wallet.oil.toFixed(2)+'</b> $OIL \u2014 tap Play to enter (25 OIL).', 'ok'); }
+      else { setStatus('Connected as <span class="addr">'+shortAddr(owner)+'</span><br/>'+pfx+'This wallet holds <b>'+wallet.oil.toFixed(2)+'</b> $OIL \u2014 need at least '+CFG.ENTRY_FEE+' to play.', 'warn'); }
+      relabelStart();
+    }
+
+    // ---- payment (one signed SPL transfer + memo — verbatim from Rush/Mr Bot) ----
+    var PENDING_KEY='burn_pending_action';
+    function savePending(a){ try{ localStorage.setItem(PENDING_KEY, JSON.stringify(a)); }catch(e){} }
+    function loadPending(){ try{ var v=localStorage.getItem(PENDING_KEY); return v?JSON.parse(v):null; }catch(e){ return null; } }
+    function clearPending(){ try{ localStorage.removeItem(PENDING_KEY); }catch(e){} }
+    function PayError(msg){ this.userMessage=msg; }
+    function u64LE(amount){ var out=new Uint8Array(8); var big=BigInt(Math.round(amount)); for(var i=0;i<8;i++){ out[i]=Number(big&0xffn); big>>=8n; } return out; }
+    function buildTransferIx(src,dst,owner,amt){ var data=new Uint8Array(9); data[0]=3; data.set(u64LE(amt),1);
+      return new solanaWeb3.TransactionInstruction({ programId:new solanaWeb3.PublicKey(CFG.TOKEN_PROGRAM),
+        keys:[{pubkey:src,isSigner:false,isWritable:true},{pubkey:dst,isSigner:false,isWritable:true},{pubkey:owner,isSigner:true,isWritable:false}], data:data }); }
+    function buildMemoIx(owner,text){ return new solanaWeb3.TransactionInstruction({ programId:new solanaWeb3.PublicKey(CFG.MEMO_PROGRAM), keys:[{pubkey:owner,isSigner:true,isWritable:false}], data:new TextEncoder().encode(text) }); }
+    async function confirmSignature(connection,signature,timeoutMs){ var start=Date.now();
+      while(Date.now()-start<timeoutMs){ var res=await connection.getSignatureStatuses([signature]); var st=res&&res.value&&res.value[0];
+        if(st){ if(st.err) throw new PayError('The transaction failed on-chain \u2014 no charge was made. Please try again.'); if(st.confirmationStatus==='confirmed'||st.confirmationStatus==='finalized') return true; } await delay(1500); } return false; }
+
+    async function sendPayment(amountOil, memoText, action){
+      var provider=getProvider();
+      var useMobile=!provider && window.PhantomMobile && PhantomMobile.isMobile() && PhantomMobile.hasSession();
+      if(!provider && !useMobile) throw new PayError('Phantom isn\u2019t reachable here \u2014 open this page in your browser, or tap Connect again on mobile.');
+      var ownerPk=new solanaWeb3.PublicKey(wallet.pubkey);
+      var connection=new solanaWeb3.Connection(CFG.RPC,'confirmed');
+      var tokAccts=await connection.getTokenAccountsByOwner(ownerPk,{ mint:new solanaWeb3.PublicKey(CFG.OIL_MINT) });
+      if(!tokAccts.value.length) throw new PayError('No $OIL account found in this wallet.');
+      var sourcePubkey=tokAccts.value[0].pubkey;
+      var balInfo=await connection.getTokenAccountBalance(sourcePubkey);
+      var needBase=Math.round(amountOil*Math.pow(10,CFG.DECIMALS));
+      if(Number(balInfo.value.amount)<needBase) throw new PayError('Not enough liquid $OIL \u2014 need '+amountOil+'.');
+      var destPubkey=new solanaWeb3.PublicKey(CFG.TREASURY_TOKEN_ACCOUNT);
+      var tx=new solanaWeb3.Transaction();
+      tx.add(buildTransferIx(sourcePubkey,destPubkey,ownerPk,needBase), buildMemoIx(ownerPk,memoText));
+      tx.feePayer=ownerPk; var latest=await connection.getLatestBlockhash(); tx.recentBlockhash=latest.blockhash;
+      if(useMobile){
+        var pend={ action:action, owner:wallet.pubkey, marker:'burn_sign' };
+        if(action==='score' && pendingResult){ pend.entrySig=entrySig; pend.score=pendingResult.score; pend.height=pendingResult.height; pend.oil=pendingResult.oil; pend.timeMs=pendingResult.timeMs; }
+        savePending(pend); setStatus('Opening Phantom to approve\u2026');
+        var unsigned=tx.serialize({ requireAllSignatures:false, verifySignatures:false });
+        PhantomMobile.signTransaction(unsigned, window.location.origin+window.location.pathname, 'burn_sign'); return null;
+      }
+      var signed=await provider.signTransaction(tx); setStatus('Sending payment\u2026');
+      var rawSig=await connection.sendRawTransaction(signed.serialize(),{ skipPreflight:false }); setStatus('Payment sent \u2014 waiting for confirmation\u2026');
+      var ok=await confirmSignature(connection,rawSig,30000); if(!ok) throw new PayError('Confirmation is taking longer than expected. Signature: '+rawSig+'. Do not pay again \u2014 check it first.');
+      return rawSig; // base58 on-chain signature
+    }
+
+    // ---- score memo (BURN — no seed, no move-log, no replay; records NOT verified) ----
+    function buildScoreMemo(res){ return MEMO_TAG+'|score|sig='+String(entrySig).slice(0,32)+'|score='+res.score+'|stage='+res.stage+'|hits='+res.hits+'|time='+res.timeMs; }
+
+    // ---- flow glue (Bot Smash: single-run action game) ---------------------
+    function relabelStart(){
+      var b=$('paidPlayBtn'); if(!b) return;
+      b.textContent = canPlay() ? 'Play (25 OIL)' : (wallet.pubkey ? 'Need 25 OIL to play' : 'Connect wallet first');
+    }
+    function relabelStartBusy(t){ var b=$('paidPlayBtn'); if(b) b.textContent=t; }
+
+    function onEntryConfirmed(sig){ entrySig=sig; busy=false; lockModeToggle(true);
+      setStatus('Entry paid \u2014 good luck! Post your score after the run.', 'ok');
+      window.BOTBURNEREngine.start(); }
+
+    // Called by the engine at game over. Returns true if this was a paid run (engine then skips its free overlay).
+    function onRunEnd(res){
+      if(mode!=='paid' || !entrySig) return false;
+      pendingResult={ score:res.score, stage:res.stage, hits:res.hits, timeMs:res.timeMs };
+      showRunOver(pendingResult); return true;
+    }
+    function fmtTime(ms){ var s=Math.round(ms/1000); return Math.floor(s/60)+':'+String(s%60).padStart(2,'0'); }
+
+    function showRunOver(res){
+      setStatus('Run over \u2014 post your score below to record it (1 OIL).', 'ok'); relabelStart();
+      var ov=$('paidOverlay'); ov.classList.add('show');
+      ov.innerHTML='<div class="card win"><h2>RUN OVER</h2><p>Stage <b>'+res.stage+'/23</b> \u00b7 Hits <b>'+res.hits+'</b> \u00b7 Score <b>'+res.score+'</b> \u00b7 Time <b>'+fmtTime(res.timeMs)+'</b><br/>Post it to the leaderboard (1 OIL) \u2014 a fun ranking, not verified.</p>'+
+        '<button class="btn" id="postBtn">Post score (1 OIL)</button></div>';
+      $('postBtn').addEventListener('click', onPost, { once:false });
+    }
+    async function onPost(){
+      if(busy || !pendingResult) return;
+      busy=true; var pb=$('postBtn'); if(pb){ pb.disabled=true; pb.textContent='Posting\u2026'; }
+      var memo=buildScoreMemo(pendingResult);
+      try{ var sig=await sendPayment(CFG.POST_FEE, memo, 'score'); if(sig===null) return; showPosted(pendingResult); }
+      catch(e){ setStatus('Connected as <span class="addr">'+shortAddr(wallet.pubkey||'')+'</span><br/>'+((e instanceof PayError)?e.userMessage:'Your score post didn\u2019t confirm. Nothing recorded yet \u2014 tap to retry.'), 'warn');
+        if(pb){ pb.disabled=false; pb.textContent='Retry post'; } busy=false; }
+    }
+    function showPosted(res){ pendingResult=null; entrySig=null; busy=false; lockModeToggle(false);
+      $('posted-text').innerHTML='Stage <b>'+res.stage+'/23</b> \u00b7 Hits <b>'+res.hits+'</b> \u00b7 Score <b>'+res.score+'</b> \u00b7 Time <b>'+fmtTime(res.timeMs)+'</b>. It\u2019ll appear on the leaderboard once recorded on-chain \u2014 a fun ranking, not verified.';
+      $('paidOverlay').classList.remove('show');
+      $('postedSheet').classList.add('show');
+    }
+
+    // Paid start card (idle state before entry) — mirrors Mr Bot's resetToPlay.
+    function showPaidStart(){
+      entrySig=null; pendingResult=null; busy=false; lockModeToggle(false);
+      var ov=$('paidOverlay'); ov.classList.add('show');
+      ov.innerHTML='<div class="card"><h2>BOT BURNER \u2014 PAID</h2><p>25 OIL entry \u00b7 one run (3 lives, no continues) \u00b7 fun leaderboard, not verified. Auto-bounce up the volcano, grab oil, outrun the lava \u2014 holders \u00d71.5.</p>'+
+        '<button class="btn" id="paidPlayBtn">Play (25 OIL)</button></div>';
+      $('paidPlayBtn').addEventListener('click', function(){ handleStart(); });
+      relabelStart();
+      if(wallet.pubkey) checkBalance(wallet.pubkey);
+    }
+
+    // ---- connect (desktop + mobile — verbatim from Rush/Mr Bot) ------------
+    async function onConnect(){
+      var provider=getProvider();
+      if(!provider){
+        if(window.PhantomMobile && PhantomMobile.isMobile()){
+          var inBrowse=new URLSearchParams(window.location.search).get('src')==='browse';
+          if(!inBrowse){ connectBtn.disabled=true; connectBtn.textContent='Opening in Phantom\u2026'; setStatus('Opening this game inside Phantom\u2019s browser.');
+            var target=window.location.origin+window.location.pathname+'?src=browse';
+            window.location.href='https://phantom.app/ul/browse/'+encodeURIComponent(target)+'?ref='+encodeURIComponent(window.location.origin); return; }
+          connectBtn.disabled=true; connectBtn.textContent='Opening Phantom\u2026'; setStatus('Opening Phantom \u2014 approve, then you\u2019ll come back here.');
+          PhantomMobile.connect(window.location.origin+window.location.pathname); return;
+        }
+        setStatus('Phantom isn\u2019t reachable here. Open this page in a browser with the <a href="https://phantom.app" target="_blank" rel="noopener">Phantom</a> extension.', 'warn'); return;
+      }
+      connectBtn.disabled=true; connectBtn.textContent='Connecting\u2026';
+      try{ var resp=await provider.connect(); wallet.pubkey=resp.publicKey.toString(); connectBtn.textContent='Connected';
+        setStatus('Connected as <span class="addr">'+shortAddr(wallet.pubkey)+'</span><br/>Checking your $OIL balance\u2026'); checkBalance(wallet.pubkey);
+      }catch(e){ connectBtn.disabled=false; connectBtn.textContent='Connect'; setStatus('Connection cancelled. Tap Connect to try again.', 'warn'); }
+    }
+
+    // ---- play (25 OIL entry) -----------------------------------------------
+    async function onPlay(){
+      if(busy || entrySig) return;
+      if(!canPlay()){ setStatus('Connect a wallet holding at least '+CFG.ENTRY_FEE+' $OIL to play.', 'warn'); return; }
+      busy=true; relabelStartBusy('Sending entry\u2026');
+      try{ var sig=await sendPayment(CFG.ENTRY_FEE, MEMO_TAG+'|entry', 'entry'); if(sig===null) return; onEntryConfirmed(sig); }
+      catch(e){ setStatus('Connected as <span class="addr">'+shortAddr(wallet.pubkey||'')+'</span><br/>'+((e instanceof PayError)?e.userMessage:'Something went wrong sending the entry. No confirmed charge means nothing was taken.'), 'warn');
+        busy=false; relabelStart(); }
+    }
+
+    // handleStart is the entry gate reused by the Paid start card's Play button.
+    function handleStart(){
+      if(mode!=='paid') return false;      // Free: engine runs as normal
+      if(busy || entrySig) return true;    // in-flight or a paid run already armed: block
+      if(!wallet.pubkey){ setStatus('Connect a wallet with at least '+CFG.ENTRY_FEE+' $OIL, then tap Play.', 'warn'); return true; }
+      onPlay(); return true;
+    }
+
+    function onAgain(){ $('postedSheet').classList.remove('show'); window.BOTBURNEREngine.idle(); showPaidStart(); }
+
+    // ---- mobile redirect resume (verbatim from Rush/Mr Bot; carries waves/score/timeMs) --
+    async function resume(){
+      var actionParam=new URLSearchParams(window.location.search).get('phantom_action');
+      if(!actionParam){
+        if(!wallet.pubkey && window.PhantomMobile && PhantomMobile.hasSession()){ wallet.pubkey=PhantomMobile.getSessionPublicKey();
+          connectBtn.textContent='Connected'; connectBtn.disabled=true; setStatus('Connected as <span class="addr">'+shortAddr(wallet.pubkey)+'</span><br/>Checking your $OIL balance\u2026'); checkBalance(wallet.pubkey); }
+        return;
+      }
+      connectBtn.disabled=true; connectBtn.textContent='Finishing\u2026'; setStatus('Almost there \u2014 finishing up with Phantom\u2026');
+      var pending=loadPending(); var marker=pending?pending.marker:'burn_sign';
+      var result=window.PhantomMobile?PhantomMobile.consumePendingRedirect(marker):null;
+      if(result&&result.type==='connect'){ wallet.pubkey=result.publicKey; connectBtn.textContent='Connected';
+        setStatus('Connected as <span class="addr">'+shortAddr(wallet.pubkey)+'</span><br/>Checking your $OIL balance\u2026'); checkBalance(wallet.pubkey); return; }
+      if(result&&result.type==='signTransaction'&&pending){ connectBtn.textContent='Connected'; connectBtn.disabled=true; if(pending.owner) wallet.pubkey=pending.owner; clearPending();
+        try{ var connection=new solanaWeb3.Connection(CFG.RPC,'confirmed'); var rawSig=await connection.sendRawTransaction(result.txBytes,{ skipPreflight:false });
+          setStatus('Payment sent \u2014 waiting for confirmation\u2026'); var ok=await confirmSignature(connection,rawSig,30000);
+          if(!ok) throw new PayError('Confirmation slow. Signature: '+rawSig+'. Do not pay again \u2014 check it first.');
+          if(pending.action==='entry'){ onEntryConfirmed(rawSig); }
+          else if(pending.action==='score'){ pendingResult={ score:pending.score, stage:pending.stage, hits:pending.hits, timeMs:pending.timeMs }; showPosted(pendingResult); }
+          if(wallet.pubkey) checkBalance(wallet.pubkey);
+        }catch(e){ setStatus('Connected as <span class="addr">'+shortAddr(wallet.pubkey||'')+'</span><br/>'+((e instanceof PayError)?e.userMessage:'Something went wrong after returning from Phantom. Check your wallet activity before retrying.'), 'warn'); }
+        return;
+      }
+      connectBtn.disabled=false; connectBtn.textContent='Connect';
+      setStatus((result&&result.type==='error')?result.message:'The connection didn\u2019t complete \u2014 tap Connect to try again.', 'warn');
+    }
+
+    function init(){
+      if(inited) return; inited=true;
+      connectBtn=$('connectBtn'); walletStatus=$('walletStatus');
+      if(TEST_MODE){ $('testBanner').classList.remove('hidden'); }
+      connectBtn.addEventListener('click', onConnect);
+      $('againBtn').addEventListener('click', onAgain);
+    }
+
+    return { init:init, resume:resume, onRunEnd:onRunEnd, handleStart:handleStart,
+             showPaidStart:showPaidStart, hasSession:function(){ return window.PhantomMobile && PhantomMobile.hasSession(); } };
+  })();
+
+  window.BOTBURNERPaid = Paid;
+
+  // ===== Mode switching (kid-safety: Paid is a deliberate opt-in) ============
+  var facts=$('facts');
+  var confirmSheet=$('confirmSheet');
+  var FREE_FACTS='Free \u00b7 wallet-free \u00b7 pays nothing';
+  var PAID_FACTS='Paid \u00b7 25 OIL entry \u00b7 one run \u00b7 fun leaderboard (not verified) \u00b7 holders \u00d71.5';
+
+  function setMode(m){
+    mode=m;
+    var f=$('modeFree'), p=$('modePaid');
+    if(m==='free'){
+      document.body.classList.remove('mode-paid');
+      f.classList.add('active'); p.classList.remove('active');
+      if(facts) facts.textContent=FREE_FACTS;
+    } else {
+      document.body.classList.add('mode-paid');
+      p.classList.add('active'); f.classList.remove('active');
+      if(facts) facts.textContent=PAID_FACTS;
+    }
+  }
+
+  $('modeFree').addEventListener('click', function(){ if(mode==='free') return; setMode('free'); window.BOTBURNEREngine.resumeFree(); });
+  $('modePaid').addEventListener('click', function(){ if(mode==='paid') return; confirmSheet.classList.add('show'); });
+  $('confirmBack').addEventListener('click', function(){ confirmSheet.classList.remove('show'); });
+  $('confirmEnter').addEventListener('click', function(){ confirmSheet.classList.remove('show'); setMode('paid'); Paid.init(); window.BOTBURNEREngine.idle(); Paid.showPaidStart(); if(Paid.hasSession && Paid.hasSession()) Paid.resume(); });
+
+  // ===== On load: Free by default. The wallet layer is only touched when returning
+  // ===== from a Phantom redirect or already inside Phantom's browser (both of which
+  // ===== can ONLY occur after the user opted into Paid). =====================
+  (function boot(){
+    var params=new URLSearchParams(window.location.search);
+    if(params.get('phantom_action') || params.get('src')==='browse'){ setMode('paid'); Paid.init(); window.BOTBURNEREngine.idle(); Paid.showPaidStart(); Paid.resume(); }
+    else { setMode('free'); }
+  })();
+})();
+</script>
+</body>
+</html>
