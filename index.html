@@ -248,7 +248,7 @@
     <div class="card" id="overCard">
       <h2 id="overTitle">RUN OVER</h2>
       <div class="big">SCORE <span id="oScore">0</span></div>
-      <p>Stage <b id="oStage">1/23</b> · Hits <b id="oHits">0</b> · Time <b id="oTime">0:00</b></p>
+      <p>Stage <b id="oStage">1</b> · Hits <b id="oHits">0</b> · Time <b id="oTime">0:00</b></p>
       <button class="btn" id="retryBtn">Tap to retry</button>
     </div>
   </div>
@@ -1124,7 +1124,7 @@ if(!HEADLESS){
     ctx.fillStyle = PAL.soft;
     const kind = s.stageKind === 'canyon' ? 'CANYON' : s.stageKind === 'refuel' ? 'REFUEL'
                : s.stageKind === 'land' ? 'LANDING' : 'STAGE';
-    ctx.fillText(kind + ' ' + s.stage + '/23', 124, 14);
+    ctx.fillText(kind + ' ' + s.stage + '/' + LAST_STAGE, 124, 14);
     ctx.fillText('MSL', 196, 14);
     ctx.fillStyle = s.missiles > 10 ? PAL.mint : PAL.red;
     ctx.fillText(String(s.missiles), 222, 14);
@@ -1297,7 +1297,7 @@ if(!HEADLESS){
     document.getElementById('overTitle').textContent = s.phase === 'won' ? 'MISSION COMPLETE' : 'SHOT DOWN';
     document.getElementById('overCard').className = s.phase === 'won' ? 'card win' : 'card';
     document.getElementById('oScore').textContent = String(Math.floor(s.score));
-    document.getElementById('oStage').textContent = s.stage + '/23';
+    document.getElementById('oStage').textContent = s.stage + '/' + LAST_STAGE;
     document.getElementById('oHits').textContent = String(s.hits);
     document.getElementById('oTime').textContent = mmss(s.timeMs);
     overO.classList.add('show'); document.getElementById('retryBtn').focus();
@@ -1575,7 +1575,7 @@ if(!HEADLESS){
     function showRunOver(res){
       setStatus('Run over \u2014 post your score below to record it (1 OIL).', 'ok'); relabelStart();
       var ov=$('paidOverlay'); ov.classList.add('show');
-      ov.innerHTML='<div class="card win"><h2>RUN OVER</h2><p>Stage <b>'+res.stage+'/23</b> \u00b7 Hits <b>'+res.hits+'</b> \u00b7 Score <b>'+res.score+'</b> \u00b7 Time <b>'+fmtTime(res.timeMs)+'</b><br/>Post it to the leaderboard (1 OIL) \u2014 a fun ranking, not verified.</p>'+
+      ov.innerHTML='<div class="card win"><h2>RUN OVER</h2><p>Stage <b>'+res.stage+'/'+LAST_STAGE+'</b> \u00b7 Hits <b>'+res.hits+'</b> \u00b7 Score <b>'+res.score+'</b> \u00b7 Time <b>'+fmtTime(res.timeMs)+'</b><br/>Post it to the leaderboard (1 OIL) \u2014 a fun ranking, not verified.</p>'+
         '<button class="btn" id="postBtn">Post score (1 OIL)</button></div>';
       $('postBtn').addEventListener('click', onPost, { once:false });
     }
@@ -1588,7 +1588,7 @@ if(!HEADLESS){
         if(pb){ pb.disabled=false; pb.textContent='Retry post'; } busy=false; }
     }
     function showPosted(res){ pendingResult=null; entrySig=null; busy=false; lockModeToggle(false);
-      $('posted-text').innerHTML='Stage <b>'+res.stage+'/23</b> \u00b7 Hits <b>'+res.hits+'</b> \u00b7 Score <b>'+res.score+'</b> \u00b7 Time <b>'+fmtTime(res.timeMs)+'</b>. It\u2019ll appear on the leaderboard once recorded on-chain \u2014 a fun ranking, not verified.';
+      $('posted-text').innerHTML='Stage <b>'+res.stage+'/'+LAST_STAGE+'</b> \u00b7 Hits <b>'+res.hits+'</b> \u00b7 Score <b>'+res.score+'</b> \u00b7 Time <b>'+fmtTime(res.timeMs)+'</b>. It\u2019ll appear on the leaderboard once recorded on-chain \u2014 a fun ranking, not verified.';
       $('paidOverlay').classList.remove('show');
       $('postedSheet').classList.add('show');
     }
