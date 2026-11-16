@@ -1840,7 +1840,7 @@ function plY(s){ return PL_Y0 - s.py * PL_Y; }
 /* ---- headless export for VERIFY ------------------------------------------ */
 const HEADLESS = (typeof document === 'undefined');
 if(HEADLESS){ module.exports = { CFG, RUN, STAGES, FORMS, BOGEY, newRun, stepGame,
-                                 fireMissiles, project, retX, retY, plX, plY,
+                                 fireMissiles, project, retX, retY, plX, plY, enterStage,
                                  W:W, H:H, HORIZON:HORIZON, THR:THR }; }
 
 /* ======================= DOM / RENDER / INPUT (browser) =================== */
